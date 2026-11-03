@@ -1,0 +1,9 @@
+{
+    "name": "Aib",
+    "rootNamespace": "Aib",
+    "references": [
+        "Unity.Notifications.Unified",
+        "Unity.InputSystem"
+    ],
+    "autoReferenced": true
+}
