@@ -29,9 +29,11 @@ namespace Aib.UI
                 .ToHashSet();
 
             _scroll = Ui.Scroll("grow");
+            var content = Ui.Box("alphabet-content"); // detail beside the grid in landscape
+            _scroll.Add(content);
             _detail = Ui.Box("letter-detail");
             _detail.Add(Ui.Label($"Изучено букв: {_learned.Count}. Нажмите на букву, чтобы перечитать объяснение.", "muted", "center"));
-            _scroll.Add(_detail);
+            content.Add(_detail);
 
             var grid = Ui.Box("letter-grid");
             foreach (var letter in app.Course.Letters)
@@ -40,7 +42,7 @@ namespace Aib.UI
                 if (_learned.Contains(letter.id)) cell.AddToClassList("learned");
                 grid.Add(cell);
             }
-            _scroll.Add(grid);
+            content.Add(grid);
             Add(_scroll);
         }
 
@@ -92,6 +94,9 @@ namespace Aib.UI
                         bool show = more.style.display == DisplayStyle.None;
                         more.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
                         toggle.text = show ? "Скрыть ▴" : "Подробнее о звуке ▾";
+                        // Bring the opened text into view once it has been laid out.
+                        var scroll = more.GetFirstAncestorOfType<ScrollView>();
+                        if (show && scroll != null) scroll.schedule.Execute(() => scroll.ScrollTo(more)).StartingIn(50);
                     }, "btn-ghost", "small");
                     card.Add(toggle);
                 }

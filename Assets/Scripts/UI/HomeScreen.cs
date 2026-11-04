@@ -23,7 +23,9 @@ namespace Aib.UI
             header.Add(Ui.Label($"Изучено букв: {learned} из {app.Course.Letters.Count}", "muted"));
             Add(header);
 
-            var list = Ui.Scroll("grow");
+            var scroll = Ui.Scroll("grow");
+            var list = Ui.Box("day-list"); // two columns in landscape
+            scroll.Add(list);
 
             int due = app.Progress.Due(today).Count;
             if (due > 0)
@@ -73,8 +75,8 @@ namespace Aib.UI
                 }
                 list.Add(card);
             }
-            list.Add(Ui.Label("Новые уроки скоро появятся!", "muted", "center"));
-            Add(list);
+            list.Add(Ui.Label("Новые уроки скоро появятся!", "muted", "center", "full-row"));
+            Add(scroll);
 
             var footer = Ui.Box("footer");
             footer.Add(Ui.Button("Алфавит", app.ShowAlphabet, "btn-secondary", "grow"));
@@ -82,7 +84,8 @@ namespace Aib.UI
             Add(footer);
 
             var settings = Ui.Box("footer");
-            settings.Add(Ui.Button("🔔 " + Reminders.Label(app.Progress.reminderHour), () =>
+            if (Reminders.Supported)
+                settings.Add(Ui.Button("🔔 " + Reminders.Label(app.Progress.reminderHour), () =>
             {
                 app.Progress.reminderHour = Reminders.NextHour(app.Progress.reminderHour);
                 app.SaveProgress();

@@ -25,7 +25,7 @@ namespace Aib.UI
         readonly LessonPlan _plan;
         readonly LessonSession _session;
         readonly VisualElement _progressFill;
-        readonly VisualElement _body;
+        readonly ScrollView _body;
         readonly VisualElement _footer;
         readonly Button _back;
         bool _hadMistake;
@@ -47,7 +47,12 @@ namespace Aib.UI
             top.Add(Ui.Button("✕", app.ShowHome, "btn-icon", "gap-left"));
             Add(top);
 
-            _body = Ui.Box("lesson-body", "grow");
+            // Scrolls when a card grows (hints, deep explanations), so nothing hides under the footer.
+            // Short content stays vertically centred: the content is at least as tall as the viewport.
+            _body = Ui.Scroll("grow");
+            _body.contentContainer.AddToClassList("lesson-body");
+            _body.contentViewport.RegisterCallback<GeometryChangedEvent>(e =>
+                _body.contentContainer.style.minHeight = e.newRect.height);
             Add(_body);
             _footer = Ui.Box("lesson-footer");
             Add(_footer);
@@ -71,7 +76,7 @@ namespace Aib.UI
         void ShowIntro()
         {
             _back.visible = false;
-            _body.Clear();
+            ClearBody();
             _body.Add(Ui.Label(_plan.Heading, "muted", "center"));
             _body.Add(Ui.Label(_plan.Title, "title", "center"));
             _body.Add(Ui.Label(_plan.Intro, "body", "center"));
@@ -89,7 +94,7 @@ namespace Aib.UI
 
             _back.visible = true;
             _hadMistake = false;
-            _body.Clear();
+            ClearBody();
             _footer.Clear();
             _footer.RemoveFromClassList("feedback");
             var ex = _session.Current;
@@ -298,12 +303,18 @@ namespace Aib.UI
         {
             var lines = _plan.Finish(_session).ToList();
             _back.visible = false;
-            _body.Clear();
+            ClearBody();
             _body.Add(Ui.Label("Готово!", "title", "center"));
             _body.Add(Ui.Label(Ui.Stars(Progress.DayUnlock.Stars(_session.Mistakes)), "result-stars"));
             foreach (var line in lines)
                 _body.Add(Ui.Label(line, "body", "center"));
             SetFooter(null, "На главную", _app.ShowHome);
+        }
+
+        void ClearBody()
+        {
+            _body.Clear();
+            _body.scrollOffset = UnityEngine.Vector2.zero;
         }
 
         static string Capitalize(string word, string glyph) =>

@@ -22,8 +22,13 @@ namespace Aib.UI
         public ProgressData Progress { get; private set; }
         public AudioService Audio { get; private set; }
 
+        /// <summary>Layout is designed for 1280 units of height and 720 of width (portrait).</summary>
+        static readonly Vector2Int Reference = new Vector2Int(720, 1280);
+
+        PanelSettings _panel;
         VisualElement _root;
         VisualElement _screenHost;
+        Vector2Int _appliedScreen;
         Rect _appliedSafeArea;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -44,15 +49,14 @@ namespace Aib.UI
             Progress = ProgressStore.Load();
             Audio = gameObject.AddComponent<AudioService>();
 
-            var panel = ScriptableObject.CreateInstance<PanelSettings>();
-            panel.themeStyleSheet = Resources.Load<ThemeStyleSheet>("UI/AppTheme");
-            panel.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-            panel.referenceResolution = new Vector2Int(720, 1280);
-            panel.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
-            panel.match = 0f;
+            _panel = ScriptableObject.CreateInstance<PanelSettings>();
+            _panel.themeStyleSheet = Resources.Load<ThemeStyleSheet>("UI/AppTheme");
+            _panel.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            _panel.referenceResolution = Reference;
+            _panel.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
 
             var doc = gameObject.AddComponent<UIDocument>();
-            doc.panelSettings = panel;
+            doc.panelSettings = _panel;
 
             _root = doc.rootVisualElement;
             _root.AddToClassList("app");
@@ -60,6 +64,7 @@ namespace Aib.UI
             _screenHost = new VisualElement();
             _screenHost.AddToClassList("screen-host");
             _root.Add(_screenHost);
+            ApplyLayout(new Vector2Int(Screen.width, Screen.height), Screen.safeArea);
 
             Reminders.Schedule(Progress, DoneToday());
             ShowHome();
@@ -88,17 +93,32 @@ namespace Aib.UI
                 _screenHost.childCount > 0 && _screenHost[0] is IBackHandler screen)
                 screen.OnBack();
 
-            // Keep content clear of notches and home indicators.
-            var safe = Screen.safeArea;
-            if (safe == _appliedSafeArea || Screen.width == 0 || Screen.height == 0) return;
+            ApplyLayout(new Vector2Int(Screen.width, Screen.height), Screen.safeArea);
+        }
+
+        /// <summary>
+        /// Portrait (phones) scales by width, landscape (PC, web, tablets) by height, so the UI
+        /// always has 1280 units of height to work with. The root gets a "portrait" or
+        /// "landscape" class for layout rules in App.uss, and padding that keeps content clear
+        /// of notches, rounded corners and the home indicator.
+        /// </summary>
+        void ApplyLayout(Vector2Int screen, Rect safe)
+        {
+            if (screen.x <= 0 || screen.y <= 0 || (screen == _appliedScreen && safe == _appliedSafeArea)) return;
+            _appliedScreen = screen;
             _appliedSafeArea = safe;
-            var size = _root.layout.size;
-            if (float.IsNaN(size.x) || size.x <= 0) return;
-            float sx = size.x / Screen.width, sy = size.y / Screen.height;
-            _root.style.paddingLeft = safe.xMin * sx;
-            _root.style.paddingRight = (Screen.width - safe.xMax) * sx;
-            _root.style.paddingTop = (Screen.height - safe.yMax) * sy;
-            _root.style.paddingBottom = safe.yMin * sy;
+
+            bool landscape = screen.x > screen.y;
+            _panel.match = landscape ? 1f : 0f;
+            _root.EnableInClassList("landscape", landscape);
+            _root.EnableInClassList("portrait", !landscape);
+
+            // Screen pixels per UI unit, as ScaleWithScreenSize computes it for match 0 or 1.
+            float scale = landscape ? (float)screen.y / Reference.y : (float)screen.x / Reference.x;
+            _root.style.paddingLeft = safe.xMin / scale;
+            _root.style.paddingRight = (screen.x - safe.xMax) / scale;
+            _root.style.paddingTop = (screen.y - safe.yMax) / scale;
+            _root.style.paddingBottom = safe.yMin / scale;
         }
 
         void Show(VisualElement screen)

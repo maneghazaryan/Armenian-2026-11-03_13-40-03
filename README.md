@@ -39,6 +39,15 @@ letters a day, and from day 1 you read real words made only of the letters you k
 
 The app builds its UI at startup (`AppRoot`), so the scene needs no setup.
 
+## Screens and platforms
+
+The UI is laid out for 1280 units of height. Phones (portrait) scale by width; landscape
+windows (PC, web, tablets) scale by height. The root element gets a `portrait` or `landscape`
+class, and the landscape rules at the end of `App.uss` add a centred column, two-column lesson
+list and the alphabet with the chosen letter beside the grid. The window can be resized at any
+time. Padding from `Screen.safeArea` keeps content clear of notches and the home indicator.
+The Android back button and Escape on PC both go back one step. Reminders exist only on phones.
+
 ## Adding a lesson
 1. Add an entry to `lessons.json` (next `day`, `newLetters` by letter `id`, `words`, `phrases`).
 2. Run `python3 Tools/validate_course.py`. It must report 0 errors.

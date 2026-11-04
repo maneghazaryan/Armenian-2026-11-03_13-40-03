@@ -12,6 +12,13 @@ namespace Aib.Progress
         const int DaysAhead = 7;
         public static readonly int[] Hours = { 9, 13, 19, 21 };
 
+        /// <summary>Local notifications exist only on phones; PC and web builds hide the setting.</summary>
+#if UNITY_ANDROID || UNITY_IOS
+        public const bool Supported = true;
+#else
+        public const bool Supported = false;
+#endif
+
         static readonly string[] Texts =
         {
             "Բարև! Пора заниматься: 10 минут армянского.",

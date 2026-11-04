@@ -125,7 +125,17 @@ namespace Aib.Progress
             return new ProgressData();
         }
 
-        public static void Save(ProgressData data) =>
+        public static void Save(ProgressData data)
+        {
             File.WriteAllText(FilePath, JsonUtility.ToJson(data, true));
+#if UNITY_WEBGL && !UNITY_EDITOR
+            AibSyncFs();
+#endif
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        static extern void AibSyncFs();
+#endif
     }
 }
