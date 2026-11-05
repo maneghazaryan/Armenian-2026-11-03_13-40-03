@@ -6,22 +6,37 @@ letters a day, and from day 1 you read real words made only of the letters you k
 (ա ս ր → սա, ասա, արա, սար). The UI and all explanations are in Russian.
 
 ## How it works
-- **One lesson per day, review first.** The next lesson opens the day after the current one
-  is passed, and only after today's review is done. (Debug builds show a switch to lift the
-  day limit for testing; release builds don't.)
+- **One lesson per day — or several, the learner chooses.** With «Один урок в день» on (the
+  default) the next lesson opens the day after the current one is passed; switched off on the
+  home screen, the next lesson opens right away. Either way today's review comes first.
+- **The whole alphabet in 17 days:** ս ա ր · մ ի · ն ե · ո տ · ու լ · կ վ է · բ և · պ դ ·
+  գ զ · շ ժ · հ յ · խ ղ · թ ք փ · ծ ց · ճ չ ջ · ռ ձ ը · օ ֆ.
 - **Spaced review (Leitner boxes).** Every learned letter and word comes back after 1, 3, 7,
   14 and 30 days; a mistake sends it back to "tomorrow". At most 12 items per day.
-- **Each lesson:** new letter cards (Russian sound, tips, a «Как запомнить» shape association
-  for every letter, small and capital — e.g. ր looks like a handwritten Russian «р» — and an
-  optional «Подробнее» deep explanation with English comparisons, e.g. թ = տ + հ = English
-  "t" in "top") → find the letter → match capital ↔ small letters (new ones plus two older
-  ones) → **each new word is shown with its meaning first** → read a word (sometimes
-  capitalised) and pick its meaning → build it from letter tiles → listen and choose (only
-  when audio exists) → read short phrases aloud. A question answered wrongly comes back
-  again at the end of the lesson. «‹» goes back one step; the Android back button works too.
+- **Each day has three parts**, opened one after another:
+  1. *Lesson* — new letter cards (Russian sound, Russian letter name, a «Как запомнить»
+     association that builds on letters already learned, e.g. ի is ր with the stem up, ա is
+     ս plus a stick and a tail; an optional «Подробнее» explanation) → find the letter →
+     match capital ↔ small → **each new word is shown with its meaning first** → read a word
+     and pick its meaning → build it from letter tiles.
+  2. *Practice* — the same words from other angles: meaning → Armenian word, reading,
+     spelling, listening (only when audio exists), capitals.
+  3. *Reading* — familiar Russian sentences in which the known sounds are written in Armenian
+     letters («Սиրենա зաпелա…»), then short Armenian phrases.
+
+  The same kind of exercise, or the same word, never comes twice in a row. A question
+  answered wrongly comes back at the end of the part. After the first meeting, the meaning
+  and pronunciation of an Armenian word are hidden behind «Подсказка» / a tap. «‹» goes back
+  one step; the Android back button and Escape work too.
+- **Armenian vs Russian at a glance:** Armenian text is red; in mixed text Armenian letters
+  are red and bold, Russian ones plain.
+- **Explanations never mention letters the learner hasn't met yet** — checked by
+  `Tools/validate_course.py` and the tests.
 - **Alphabet:** learned letters open their full explanation any time; others show the day
   they will be learned.
-- **Dictionary (Словарь):** all words, phrases and verses from completed days.
+- **Dictionary (Словарь):** all words, phrases and verses from completed days; read first, tap
+  to see the meaning. Words with mistakes are highlighted until two reviews in a row go well
+  (the alphabet marks such letters too).
 - **Daily reminders:** local notifications (no server) at 9, 13, 19 or 21 h, or off.
 - Progress is saved on the device (`progress.json` in `Application.persistentDataPath`).
 
@@ -48,8 +63,23 @@ list and the alphabet with the chosen letter beside the grid. The window can be 
 time. Padding from `Screen.safeArea` keeps content clear of notches and the home indicator.
 The Android back button and Escape on PC both go back one step. Reminders exist only on phones.
 
+## Web version
+
+Live: https://maneghazaryan.github.io/ayb/ (repository `maneghazaryan/ayb` holds only the build).
+
+Build: menu **Ayb → Build Web**, or with the editor closed
+
+    Unity -batchmode -quit -projectPath . -buildTarget WebGL -executeMethod Aib.Editor.WebBuild.Build
+
+The build goes to `Build/Web`. It uses the full-window template in `Assets/WebGLTemplates/Ayb`
+and gzip with decompression fallback, which GitHub Pages needs. Progress is saved in the
+browser's IndexedDB (`Assets/Plugins/WebGL/AibStorage.jslib`).
+
+Update the site: copy `Build/Web` into a clone of `maneghazaryan/ayb` (keep `.nojekyll` and
+`README.md`), commit and push. Pages republishes within a minute or two.
+
 ## Adding a lesson
-1. Add an entry to `lessons.json` (next `day`, `newLetters` by letter `id`, `words`, `phrases`).
+1. Add an entry to `lessons.json` (next `day`, `newLetters` by letter `id`, `words` with an optional `note`, `phrases`, and Russian `texts` for the reading part — the app writes their known sounds in Armenian letters itself).
 2. Run `python3 Tools/validate_course.py`. It must report 0 errors.
 
 ## Audio
@@ -70,6 +100,7 @@ Unity -batchmode -projectPath . -runTests -testPlatform EditMode -testResults re
 
 ## Roadmap
 1. ✅ Reading MVP: days 1–7 (16 letters), spaced review, dictionary, reminders.
-2. Full alphabet (~20 lessons), verses, record-and-compare speaking practice.
-3. Optional AI tutor (Google Gemini free tier behind a free Cloudflare Worker) that explains
+2. ✅ Full alphabet: days 8–17 (39 letters).
+3. Verses, audio, record-and-compare speaking practice.
+4. Optional AI tutor (Google Gemini free tier behind a free Cloudflare Worker) that explains
    grammar in Russian using only the letters you have learned.

@@ -10,7 +10,10 @@ namespace Aib.Data
         public string id;
         public string upper;
         public string lower;
+        /// <summary>Armenian letter name (used for audio); learners see <see cref="nameRu"/>.</summary>
         public string name;
+        /// <summary>Letter name written in Russian, e.g. «айб».</summary>
+        public string nameRu;
         public string ru;
         /// <summary>Shape association linking the glyph (small and capital) to its sound.</summary>
         public string look;
@@ -31,6 +34,8 @@ namespace Aib.Data
         public string tr;
         public string ru;
         public string emoji;
+        /// <summary>Optional remark shown with the meaning, e.g. a second meaning.</summary>
+        public string note;
 
         public string AudioId => "w_" + id;
         public string Key => "w:" + id;
@@ -47,6 +52,8 @@ namespace Aib.Data
         public List<WordData> phrases = new List<WordData>();
         /// <summary>Short rhymes/verses (hy may contain line breaks).</summary>
         public List<WordData> verses = new List<WordData>();
+        /// <summary>Russian sentences shown with the known sounds written in Armenian letters.</summary>
+        public List<string> texts = new List<string>();
     }
 
     [Serializable]
@@ -95,6 +102,14 @@ namespace Aib.Data
         /// <summary>Letters introduced on days 1..day, in teaching order.</summary>
         public List<LetterData> LettersUpTo(int day) =>
             Lessons.Where(l => l.day <= day).SelectMany(l => l.newLetters).Select(Letter).ToList();
+
+        /// <summary>Small letters readable after days 1..day; ու also makes its hook ւ known.</summary>
+        public HashSet<string> GlyphsUpTo(int day)
+        {
+            var set = LettersUpTo(day).Select(l => l.lower).ToHashSet();
+            if (set.Contains("ու")) set.Add("ւ");
+            return set;
+        }
 
         /// <summary>Words (not phrases) taught on days 1..day.</summary>
         public List<WordData> WordsUpTo(int day) =>

@@ -29,7 +29,10 @@ namespace Aib.Tests
             var course = LoadCourse();
             Assert.AreEqual(39, course.Letters.Count); // primer alphabet: ու and և are taught as letters
             Assert.GreaterOrEqual(course.Lessons.Count, 7);
-            CollectionAssert.AreEqual(new[] { "ա", "ս", "ր" }, course.LettersUpTo(1).Select(l => l.lower));
+            // The whole alphabet is taught: every letter belongs to some day.
+            foreach (var letter in course.Letters)
+                Assert.Greater(course.DayOf(letter), 0, letter.lower);
+            CollectionAssert.AreEqual(new[] { "ս", "ա", "ր" }, course.LettersUpTo(1).Select(l => l.lower));
         }
 
         [Test]
@@ -51,10 +54,12 @@ namespace Aib.Tests
             var course = LoadCourse();
             foreach (var lesson in course.Lessons)
             foreach (var hasAudio in new[] { false, true })
+            for (int part = 1; part <= ExerciseBuilder.Parts; part++)
             {
-                var list = ExerciseBuilder.Build(course, lesson, _ => hasAudio, seed);
-                Assert.AreEqual(lesson.newLetters.Count, list.Count(e => e.Kind == ExerciseKind.LetterIntro));
-                Assert.AreEqual(hasAudio, list.Any(e => e.Kind == ExerciseKind.ListenPickWord));
+                var list = ExerciseBuilder.Build(course, lesson, part, _ => hasAudio, seed);
+                Assert.IsNotEmpty(list, $"day {lesson.day} part {part}");
+                Assert.AreEqual(part == 1 ? lesson.newLetters.Count : 0, list.Count(e => e.Kind == ExerciseKind.LetterIntro));
+                Assert.AreEqual(hasAudio && part == 2, list.Any(e => e.Kind == ExerciseKind.ListenPickWord));
                 foreach (var ex in list.Where(e => e.IsQuiz))
                 {
                     if (ex.Kind == ExerciseKind.BuildWord)
@@ -122,7 +127,7 @@ namespace Aib.Tests
             var course = LoadCourse();
             foreach (var lesson in course.Lessons)
             {
-                var list = ExerciseBuilder.Build(course, lesson, _ => false, 5);
+                var list = ExerciseBuilder.Build(course, lesson, 1, _ => false, 5);
                 foreach (var id in lesson.newLetters)
                     Assert.IsTrue(list.Any(e => e.Kind == ExerciseKind.MatchCase && e.Letter.id == id), $"day {lesson.day}: {id}");
                 foreach (var ex in list.Where(e => e.Kind == ExerciseKind.MatchCase))
@@ -131,6 +136,91 @@ namespace Aib.Tests
             Assert.AreEqual("Ասա", ArmenianText.Capitalize("ասա"));
             Assert.AreEqual("Ուս", ArmenianText.Capitalize("ուս"));
             Assert.AreEqual("Եվա", ArmenianText.Capitalize("և" + "ա"));
+        }
+
+        [Test]
+        public void Builder_NeverRepeatsTheSameWordOrLetterInARow([Values(1, 2, 3, 4, 5)] int seed)
+        {
+            var course = LoadCourse();
+            foreach (var lesson in course.Lessons)
+            for (int part = 1; part <= 2; part++)
+            {
+                var list = ExerciseBuilder.Build(course, lesson, part, _ => true, seed);
+                int sameKind = 0;
+                for (int i = 1; i < list.Count; i++)
+                {
+                    if (!list[i].IsQuiz || !list[i - 1].IsQuiz) continue;
+                    Assert.AreNotEqual(list[i - 1].ItemKey, list[i].ItemKey, $"day {lesson.day} part {part} #{i}");
+                    if (list[i - 1].Kind == list[i].Kind) sameKind++;
+                }
+                Assert.LessOrEqual(sameKind, 1, $"day {lesson.day} part {part}: same exercise type twice in a row");
+            }
+        }
+
+        [Test]
+        public void Part3_ReadsRussianWithKnownLettersInArmenian()
+        {
+            var day1 = new HashSet<string> { "ս", "ա", "ր" };
+            Assert.AreEqual("Սиրенա зաпелա, вսе влюбилиսь.", ArmenianText.MixRussian("Сирена запела, все влюбились.", day1));
+            var course = LoadCourse();
+            Assert.AreEqual("Ոտ նոвый մոստ.", ArmenianText.MixRussian("Вот новый мост.", course.GlyphsUpTo(4)));
+            Assert.AreEqual("Երևան!", ArmenianText.MixRussian("Ереван!", course.GlyphsUpTo(7)));
+            Assert.AreEqual("окно", ArmenianText.MixRussian("окно", new HashSet<string>()));
+            Assert.AreEqual("Օլя", ArmenianText.MixRussian("Оля", course.GlyphsUpTo(17)));
+
+            foreach (var lesson in course.Lessons)
+            {
+                var texts = ExerciseBuilder.Build(course, lesson, 3, _ => false, 1).Where(e => e.Kind == ExerciseKind.MixedText).ToList();
+                Assert.AreEqual(lesson.texts.Count, texts.Count);
+                Assert.IsTrue(texts.All(t => t.Shown.Any(ArmenianText.IsArmenian)), $"day {lesson.day}");
+            }
+        }
+
+        [Test]
+        public void LetterTextsMentionOnlyLettersLearnedBefore()
+        {
+            var course = LoadCourse();
+            foreach (var lesson in course.Lessons)
+            {
+                var known = course.GlyphsUpTo(lesson.day - 1);
+                foreach (var t in ArmenianText.Tokenize(lesson.intro))
+                    Assert.IsTrue(course.GlyphsUpTo(lesson.day).Contains(t), $"day {lesson.day} intro: '{t}'");
+                foreach (var id in lesson.newLetters)
+                {
+                    var letter = course.Letter(id);
+                    known.Add(letter.lower);
+                    if (letter.lower == "ու") known.Add("ւ");
+                    foreach (var text in new[] { letter.hint, letter.look, letter.warn, letter.more })
+                    foreach (var t in ArmenianText.Tokenize(text ?? ""))
+                        Assert.IsTrue(known.Contains(t), $"letter {id} mentions unlearned '{t}'");
+                }
+            }
+            foreach (var letter in course.Letters)
+                Assert.IsFalse(string.IsNullOrEmpty(letter.nameRu), letter.id);
+        }
+
+        [Test]
+        public void Day_IsDoneAfterAllPartsInOrder()
+        {
+            var day = new DateTime(2026, 11, 5);
+            var p = new ProgressData();
+            Assert.IsFalse(p.CompletePart(1, 2, 3, 0, day)); // out of order: ignored
+            Assert.AreEqual(0, p.PartsDone(1, 3));
+            Assert.IsFalse(p.CompletePart(1, 1, 3, 1, day));
+            Assert.IsFalse(p.CompletePart(1, 2, 3, 2, day));
+            Assert.AreEqual(2, p.PartsDone(1, 3));
+            Assert.IsNull(p.Result(1));
+            Assert.IsTrue(p.CompletePart(1, 3, 3, 0, day));
+            Assert.AreEqual(2, p.Result(1).stars); // 3 mistakes over the day
+            Assert.IsFalse(p.CompletePart(1, 1, 3, 9, day)); // replay changes nothing
+            Assert.AreEqual(2, p.Result(1).stars);
+
+            p.Missed(new[] { "w:sar" });
+            Assert.IsTrue(p.IsHard("w:sar"));
+            p.Learn(new[] { "w:sar" }, day);
+            p.Reviewed("w:sar", true, day.AddDays(1));
+            p.Reviewed("w:sar", true, day.AddDays(2));
+            Assert.IsFalse(p.IsHard("w:sar"));
         }
 
         [Test]
@@ -168,7 +258,7 @@ namespace Aib.Tests
             var course = LoadCourse();
             foreach (var lesson in course.Lessons)
             {
-                var list = ExerciseBuilder.Build(course, lesson, _ => true, 7);
+                var list = ExerciseBuilder.Build(course, lesson, 1, _ => true, 7);
                 foreach (var word in lesson.words)
                 {
                     int intro = list.FindIndex(e => e.Kind == ExerciseKind.WordIntro && e.Word == word);

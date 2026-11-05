@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Айб — армянский алфавит и чтение с нуля для русскоязычных, как в армянском букваре.">
+    <title>{{{ PRODUCT_NAME }}} — армянский с нуля</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #FFF8F0; }
+      /* The canvas always fills the window; the app lays itself out for portrait or landscape. */
+      #unity-canvas { position: fixed; inset: 0; width: 100%; height: 100%; background: #FFF8F0; outline: none; }
+      #loading {
+        position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #2B2A33;
+      }
+      #loading .logo { font-size: 72px; color: #B5332E; font-weight: bold; }
+      #loading .bar { width: 240px; height: 10px; border-radius: 5px; background: #F0ECE6; overflow: hidden; margin-top: 24px; }
+      #loading .fill { width: 0; height: 100%; background: #F28C38; transition: width 0.2s; }
+      #loading .text { margin-top: 12px; color: #8A8794; font-size: 16px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="loading">
+      <div class="logo">Այբ</div>
+      <div class="bar"><div class="fill" id="fill"></div></div>
+      <div class="text" id="loading-text">Загрузка…</div>
+    </div>
+    <script src="Build/{{{ LOADER_FILENAME }}}"></script>
+    <script>
+      createUnityInstance(document.querySelector("#unity-canvas"), {
+        arguments: [],
+        dataUrl: "Build/{{{ DATA_FILENAME }}}",
+        frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_THREADS
+        workerUrl: "Build/{{{ WORKER_FILENAME }}}",
+#endif
+#if USE_WASM
+        codeUrl: "Build/{{{ CODE_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+        symbolsUrl: "Build/{{{ SYMBOLS_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+      }, (progress) => {
+        document.getElementById("fill").style.width = Math.round(progress * 100) + "%";
+      }).then(() => {
+        document.getElementById("loading").remove();
+      }).catch((message) => {
+        document.getElementById("loading-text").textContent = "Не удалось загрузить: " + message;
+      });
+    </script>
+  </body>
+</html>

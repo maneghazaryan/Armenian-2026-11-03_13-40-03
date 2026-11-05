@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Aib.Lesson;
 using Aib.Progress;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -52,6 +53,9 @@ namespace Aib.UI
                 var text = Ui.Box("grow");
                 text.Add(Ui.Label($"День {lesson.day} · {lesson.title}", "day-title"));
                 text.Add(Ui.Label(letters, "day-letters"));
+                int parts = app.Progress.PartsDone(lesson.day, ExerciseBuilder.Parts);
+                if (state == DayState.Available || state == DayState.ReviewFirst)
+                    text.Add(Ui.Label(PartDots(parts), "parts"));
                 card.Add(text);
 
                 switch (state)
@@ -61,7 +65,7 @@ namespace Aib.UI
                             () => app.ShowLesson(lesson.day), "btn-ghost", "stars"));
                         break;
                     case DayState.Available:
-                        card.Add(Ui.Button("Начать", () => app.ShowLesson(lesson.day), "btn-primary"));
+                        card.Add(Ui.Button(parts == 0 ? "Начать" : $"Часть {parts + 1}", () => app.ShowLesson(lesson.day), "btn-primary"));
                         break;
                     case DayState.ReviewFirst:
                         card.Add(Ui.Label("После\nповторения", "lock", "center"));
@@ -92,8 +96,7 @@ namespace Aib.UI
                 app.ShowHome();
             }, "btn-ghost", "small"));
 
-            // Testing aid only: release builds always keep one lesson per day.
-            if (Debug.isDebugBuild)
+            // On: the next day opens tomorrow. Off: the learner may take several lessons in one day.
             {
                 var dayLock = new Toggle("Один урок в день") { value = app.Progress.dayLock };
                 dayLock.AddToClassList("toggle");
@@ -106,6 +109,13 @@ namespace Aib.UI
                 settings.Add(dayLock);
             }
             Add(settings);
+        }
+
+        /// <summary>"● ● ○  часть 3 из 3" style progress through the parts of a day.</summary>
+        static string PartDots(int done)
+        {
+            var dots = string.Join(" ", Enumerable.Range(0, ExerciseBuilder.Parts).Select(i => i < done ? "●" : "○"));
+            return done == 0 ? $"{dots}  урок, практика, чтение" : $"{dots}  часть {done + 1} из {ExerciseBuilder.Parts}";
         }
     }
 }

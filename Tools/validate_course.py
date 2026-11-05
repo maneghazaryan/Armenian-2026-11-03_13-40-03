@@ -2,7 +2,8 @@
 """Validate the course data.
 
 Checks that every word and phrase of a lesson uses only letters taught on that
-day or earlier, that ids are unique and that each letter is introduced once.
+day or earlier, that intros and letter explanations mention only letters already
+learned, that ids are unique and that each letter is introduced once.
 
     python3 Tools/validate_course.py                 # audio missing -> warning
     python3 Tools/validate_course.py --require-audio # audio missing -> error
@@ -27,10 +28,15 @@ def tokenize(text):
             i += 2
             continue
         ch = text[i]
-        if "ա" <= ch <= "և":  # Armenian lowercase block, incl. և
+        if "ա" <= ch <= "և":  # Armenian lowercase block, incl. և and a lone ւ
             tokens.append(ch)
         i += 1
     return tokens
+
+
+def glyphs(letter):
+    """Tokens a learned letter makes readable: ու also teaches its hook ւ."""
+    return {letter["lower"]} | ({"ւ"} if letter["lower"] == "ու" else set())
 
 
 def has_audio(audio_id):
@@ -55,9 +61,24 @@ def main():
             if lid in introduced:
                 errors.append(f"day {day}: letter '{lid}' already introduced")
             introduced.add(lid)
-            known.add(by_id[lid]["lower"])
+            known.update(glyphs(by_id[lid]))
             if not has_audio("l_" + lid):
                 warnings.append(f"day {day}: no audio for letter l_{lid}")
+
+        # Intros and letter explanations may only show letters known by then
+        # (letters of the same day count once they have been introduced).
+        unknown = sorted({t for t in tokenize(lesson["intro"]) if t not in known})
+        if unknown:
+            errors.append(f"day {day}: intro uses unlearned letters {unknown}")
+        seen_today = set(known) - {g for i in lesson["newLetters"] if i in by_id for g in glyphs(by_id[i])}
+        for lid in lesson["newLetters"]:
+            if lid not in by_id:
+                continue
+            seen_today.update(glyphs(by_id[lid]))
+            for field in ("hint", "look", "warn", "more"):
+                unknown = sorted({t for t in tokenize(by_id[lid].get(field, "")) if t not in seen_today})
+                if unknown:
+                    errors.append(f"day {day}: letter {lid} {field} mentions unlearned letters {unknown}")
 
         for item in lesson["words"] + lesson.get("phrases", []) + lesson.get("verses", []):
             if item["id"] in seen_ids:

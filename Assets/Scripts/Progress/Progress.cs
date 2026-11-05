@@ -15,6 +15,23 @@ namespace Aib.Progress
         public string date; // yyyy-MM-dd, local date of first completion
     }
 
+    /// <summary>A day whose parts are partly done.</summary>
+    [Serializable]
+    public class PartProgress
+    {
+        public int day;
+        public int parts;    // parts finished, in order
+        public int mistakes; // over all finished parts
+    }
+
+    /// <summary>How often a letter or word was answered wrongly.</summary>
+    [Serializable]
+    public class MissCount
+    {
+        public string key;
+        public int count;
+    }
+
     /// <summary>A letter ("l:a") or word ("w:sar") in a Leitner box, due for review on a date.</summary>
     [Serializable]
     public class ItemState
@@ -29,6 +46,8 @@ namespace Aib.Progress
     {
         public List<DayResult> results = new List<DayResult>();
         public List<ItemState> items = new List<ItemState>();
+        public List<PartProgress> partial = new List<PartProgress>();
+        public List<MissCount> misses = new List<MissCount>();
         /// <summary>When true, the next lesson opens only on the next calendar day. Off only in debug builds.</summary>
         public bool dayLock = true;
         /// <summary>Hour of the daily reminder, or -1 when reminders are off.</summary>
@@ -45,6 +64,50 @@ namespace Aib.Progress
                 results.Add(new DayResult { day = day, stars = stars, date = DayUnlock.Format(today) });
             else
                 r.stars = Math.Max(r.stars, stars);
+        }
+
+        /// <summary>Parts of a day finished so far (all of them once the day is done).</summary>
+        public int PartsDone(int day, int partCount) =>
+            Result(day) != null ? partCount : partial.FirstOrDefault(p => p.day == day)?.parts ?? 0;
+
+        /// <summary>
+        /// Records a finished part of a day. Parts count only in order and only until the day is done
+        /// (replays change nothing). Returns true when this completed the day.
+        /// </summary>
+        public bool CompletePart(int day, int part, int partCount, int mistakes, DateTime today)
+        {
+            if (Result(day) != null) return false;
+            var p = partial.FirstOrDefault(x => x.day == day);
+            if (p == null) partial.Add(p = new PartProgress { day = day });
+            if (part != p.parts + 1) return false;
+            p.parts = part;
+            p.mistakes += mistakes;
+            if (part < partCount) return false;
+            partial.Remove(p);
+            Complete(day, DayUnlock.Stars(p.mistakes), today);
+            return true;
+        }
+
+        /// <summary>Count a wrong answer for each of these letters or words.</summary>
+        public void Missed(IEnumerable<string> keys)
+        {
+            foreach (var key in keys.Where(k => k != null))
+            {
+                var m = misses.FirstOrDefault(x => x.key == key);
+                if (m == null) misses.Add(m = new MissCount { key = key });
+                m.count++;
+            }
+        }
+
+        /// <summary>Hard item: answered wrongly and not yet remembered in two reviews in a row.</summary>
+        public bool IsHard(string key) =>
+            misses.Any(m => m.key == key) && (items.FirstOrDefault(i => i.key == key)?.box ?? 1) < 3;
+
+        /// <summary>Forget items that are no longer in the course (renamed or removed words).</summary>
+        public void Prune(Func<string, bool> exists)
+        {
+            items.RemoveAll(i => !exists(i.key));
+            misses.RemoveAll(m => !exists(m.key));
         }
 
         /// <summary>Items whose review date has come, most overdue first.</summary>

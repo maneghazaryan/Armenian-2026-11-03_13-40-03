@@ -33,6 +33,8 @@ namespace Aib.UI
             _scroll.Add(content);
             _detail = Ui.Box("letter-detail");
             _detail.Add(Ui.Label($"Изучено букв: {_learned.Count}. Нажмите на букву, чтобы перечитать объяснение.", "muted", "center"));
+            if (app.Course.Letters.Any(l => app.Progress.IsHard(l.Key)))
+                _detail.Add(Ui.Label("Жёлтым отмечены буквы, в которых были ошибки.", "muted", "center"));
             content.Add(_detail);
 
             var grid = Ui.Box("letter-grid");
@@ -40,6 +42,7 @@ namespace Aib.UI
             {
                 var cell = Ui.Button(letter.upper + letter.lower, () => ShowLetter(letter), "letter-cell");
                 if (_learned.Contains(letter.id)) cell.AddToClassList("learned");
+                if (app.Progress.IsHard(letter.Key)) cell.AddToClassList("hard");
                 grid.Add(cell);
             }
             content.Add(grid);
@@ -75,7 +78,7 @@ namespace Aib.UI
             var card = Ui.Box("letter-card");
             card.Add(Ui.Label(letter.upper + " " + letter.lower, compact ? "glyph-md" : "glyph-xl"));
             card.Add(Ui.Label("большая · маленькая", "muted", "center"));
-            card.Add(Ui.Label($"«{letter.name}» — звук [{letter.ru}]", "letter-name"));
+            card.Add(Ui.Label($"Звук [{letter.ru}] · буква «{letter.nameRu}»", "letter-name"));
             card.Add(Ui.Label(letter.hint, "body", "center"));
             if (!string.IsNullOrEmpty(letter.look))
                 card.Add(Ui.Label("Как запомнить: " + letter.look, "look"));

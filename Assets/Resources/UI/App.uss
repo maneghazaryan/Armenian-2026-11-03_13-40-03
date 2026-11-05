@@ -161,3 +161,21 @@
 
 /* lessons and dictionary: not wider than comfortable reading */
 .landscape .lesson-body, .landscape .lesson-footer { width: 100%; max-width: 1100px; align-self: center; }
+
+/* ---------- Armenian vs Russian ----------
+   Text that is only Armenian gets .hy (added by Ui.Label/Button); in mixed text the Armenian
+   letters are bold and coloured through rich text (Ui.Mark). Russian stays plain ink. */
+.hy { color: #B5332E; }
+.letter-cell.hy { color: #A8A4AE; }
+.letter-cell.learned.hy { color: #B5332E; }
+
+/* part 3: Russian written partly in Armenian letters */
+.mixed-text { font-size: 52px; -unity-text-align: middle-center; white-space: normal; margin: 20px 0; }
+.plain-text { color: #8A8794; -unity-font-style: italic; }
+
+/* parts of a day on the home screen */
+.parts { font-size: 20px; color: #8A8794; margin-top: 4px; }
+
+/* letters and words with mistakes */
+.letter-cell.hard { background-color: #FFF1C9; }
+.archive-row.hard { border-left-width: 8px; border-color: #F2A900; }

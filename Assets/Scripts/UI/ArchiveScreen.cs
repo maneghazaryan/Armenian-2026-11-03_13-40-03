@@ -20,6 +20,8 @@ namespace Aib.UI
             var scroll = Ui.Scroll("grow");
             if (done.Count == 0)
                 scroll.Add(Ui.Label("Здесь появятся слова, фразы и стихи из пройденных уроков.", "muted", "center"));
+            else
+                scroll.Add(Ui.Label("Сначала прочитайте слово сами, потом нажмите, чтобы проверить себя.", "muted", "center"));
 
             AddSection(app, scroll, "Слова", done.SelectMany(l => l.words));
             AddSection(app, scroll, "Фразы", done.SelectMany(l => l.phrases));
@@ -36,14 +38,30 @@ namespace Aib.UI
             parent.Add(Ui.Label($"{title} ({list.Count})", "section-title"));
             foreach (var item in list)
             {
+                // Read first: the meaning and pronunciation stay hidden until the row is tapped.
                 var row = Ui.Box("archive-row");
+                bool hard = app.Progress.IsHard(item.Key);
+                if (hard) row.AddToClassList("hard");
                 var text = Ui.Box("grow");
                 text.Add(Ui.Label(item.hy, "archive-hy"));
-                text.Add(Ui.Label($"[{item.tr}]  {item.ru}", "muted", "wrap"));
+                var hidden = hard ? "трудное слово · нажмите, чтобы проверить себя" : "нажмите, чтобы увидеть перевод";
+                var meaning = $"[{item.tr}]  {item.ru}" + (string.IsNullOrEmpty(item.note) ? "" : "\n" + item.note);
+                var answer = Ui.Label(hidden, "muted", "wrap");
+                text.Add(answer);
                 if (!string.IsNullOrEmpty(item.emoji)) row.Add(Ui.Label(item.emoji, "archive-emoji"));
                 row.Add(text);
                 if (app.Audio.Has(item.AudioId))
-                    row.Add(Ui.Button("🔊", () => app.Audio.Play(item.AudioId), "btn-ghost"));
+                {
+                    var play = Ui.Button("🔊", () => app.Audio.Play(item.AudioId), "btn-ghost");
+                    play.RegisterCallback<ClickEvent>(e => e.StopPropagation());
+                    row.Add(play);
+                }
+                bool shown = false;
+                row.RegisterCallback<ClickEvent>(_ =>
+                {
+                    shown = !shown;
+                    answer.text = Ui.Mark(shown ? meaning : hidden);
+                });
                 parent.Add(row);
             }
         }

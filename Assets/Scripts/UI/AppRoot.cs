@@ -47,6 +47,7 @@ namespace Aib.UI
                 Resources.Load<TextAsset>("Data/letters").text,
                 Resources.Load<TextAsset>("Data/lessons").text);
             Progress = ProgressStore.Load();
+            Progress.Prune(key => Course.ByKey(key) != null);
             Audio = gameObject.AddComponent<AudioService>();
 
             _panel = ScriptableObject.CreateInstance<PanelSettings>();
@@ -133,24 +134,46 @@ namespace Aib.UI
 
         public void ShowArchive() => Show(new ArchiveScreen(this));
 
-        public void ShowLesson(int day)
+        /// <summary>
+        /// One part of a day: 1 — new letters and words, 2 — more practice, 3 — reading.
+        /// Without a part, continues where the learner stopped (part 1 when replaying a finished day).
+        /// </summary>
+        public void ShowLesson(int day, int part = 0)
         {
             var lesson = Course.Lesson(day);
+            const int parts = ExerciseBuilder.Parts;
+            if (part == 0)
+                part = Progress.Result(day) != null ? 1 : Progress.PartsDone(day, parts) + 1;
+
+            string title = part == 1 ? lesson.title : part == 2 ? "Ещё практика" : "Читаем";
+            string intro = part == 1
+                ? lesson.intro
+                : part == 2
+                    ? "Те же слова — новые упражнения. Если слово забылось, нажмите «Подсказка»."
+                    : "Знакомые русские слова, в которых звуки, уже известные вам, записаны армянскими буквами. Армянские буквы — красные и жирные. Прочитайте вслух, потом проверьте себя.";
+
             Show(new LessonScreen(this, new LessonPlan
             {
-                Heading = $"День {day}",
-                Title = lesson.title,
-                Intro = lesson.intro,
-                Exercises = ExerciseBuilder.Build(Course, lesson, Audio.Has, Environment.TickCount),
+                Heading = $"День {day} · часть {part} из {parts}",
+                Title = title,
+                Intro = intro,
+                Exercises = ExerciseBuilder.Build(Course, lesson, part, Audio.Has, Environment.TickCount),
+                NextLabel = part < parts ? $"Часть {part + 1} ›" : null,
+                Next = part < parts ? () => ShowLesson(day, part + 1) : null,
                 Finish = session =>
                 {
                     var now = DateTime.Now;
-                    Progress.Complete(day, DayUnlock.Stars(session.Mistakes), now);
-                    Progress.Learn(lesson.newLetters.Select(id => Course.Letter(id).Key)
-                        .Concat(lesson.words.Select(w => w.Key)), now);
+                    Progress.Missed(session.Missed);
+                    bool dayDone = Progress.CompletePart(day, part, parts, session.Mistakes, now);
+                    if (dayDone)
+                        Progress.Learn(lesson.newLetters.Select(id => Course.Letter(id).Key)
+                            .Concat(lesson.words.Select(w => w.Key)), now);
                     SaveProgress();
+                    if (!dayDone)
+                        return new[] { part < parts ? $"Часть {part} из {parts} пройдена." : "Повторили ещё раз." };
                     return new[]
                     {
+                        $"День {day} пройден!",
                         "Новые буквы: " + string.Join("  ", lesson.newLetters.Select(id => Course.Letter(id).lower)),
                         "Новые слова: " + string.Join(", ", lesson.words.Select(w => w.hy)),
                         "Завтра повторим их, чтобы они запомнились.",
@@ -174,6 +197,7 @@ namespace Aib.UI
                     var now = DateTime.Now;
                     foreach (var key in keys)
                         Progress.Reviewed(key, !session.Missed.Contains(key), now);
+                    Progress.Missed(session.Missed);
                     SaveProgress();
                     int remembered = keys.Count(k => !session.Missed.Contains(k));
                     return new[]

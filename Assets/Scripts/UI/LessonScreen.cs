@@ -16,6 +16,9 @@ namespace Aib.UI
         public List<Exercise> Exercises;
         /// <summary>Saves the outcome and returns summary lines for the result screen.</summary>
         public Func<LessonSession, IEnumerable<string>> Finish;
+        /// <summary>Optional follow-up offered on the result screen, e.g. the next part of the day.</summary>
+        public string NextLabel;
+        public Action Next;
     }
 
     /// <summary>Plays a lesson or review exercise by exercise, then shows the result.</summary>
@@ -105,6 +108,8 @@ namespace Aib.UI
                 case ExerciseKind.PickLetter: ShowPickLetter(ex); break;
                 case ExerciseKind.MatchCase: ShowMatchCase(ex); break;
                 case ExerciseKind.ReadPickTranslation: ShowReadPick(ex); break;
+                case ExerciseKind.MeaningPickWord: ShowMeaningPick(ex); break;
+                case ExerciseKind.MixedText: ShowMixedText(ex); break;
                 case ExerciseKind.ListenPickWord: ShowListenPick(ex); break;
                 case ExerciseKind.BuildWord: ShowBuildWord(ex); break;
                 case ExerciseKind.Phrase: ShowPhrase(ex); break;
@@ -135,6 +140,8 @@ namespace Aib.UI
             card.Add(Ui.Label(ex.Word.hy, "word-big"));
             card.Add(Ui.Label($"[{ex.Word.tr}]", "hint"));
             card.Add(Ui.Label(ex.Word.ru, "title", "center"));
+            if (!string.IsNullOrEmpty(ex.Word.note))
+                card.Add(Ui.Label(ex.Word.note, "look"));
             if (ex.UseAudio)
             {
                 card.Add(PlayButton(ex.Word.AudioId, autoplay: true));
@@ -164,7 +171,7 @@ namespace Aib.UI
             bool fromCapital = ex.Shown == ex.Letter.upper;
             _body.Add(Ui.Label(fromCapital ? "Найдите маленькую (строчную) пару" : "Найдите большую (заглавную) пару", "prompt"));
             _body.Add(Ui.Label(ex.Shown, "glyph-xl"));
-            var pair = $"{ex.Letter.upper} {ex.Letter.lower} — «{ex.Letter.name}» [{ex.Letter.ru}]";
+            var pair = $"{ex.Letter.upper} {ex.Letter.lower} — звук [{ex.Letter.ru}]";
             AddOptions(ex, "option-glyph", o => o, extra: pair);
         }
 
@@ -180,6 +187,29 @@ namespace Aib.UI
                 hint.text = ex.Word.tr;
                 if (ex.UseAudio) _app.Audio.Play(ex.Word.AudioId);
             });
+        }
+
+        void ShowMeaningPick(Exercise ex)
+        {
+            _body.Add(Ui.Label("Как это по-армянски?", "prompt"));
+            _body.Add(Ui.Label($"{ex.Word.emoji} {ex.Word.ru}", "title", "center"));
+            AddOptions(ex, "option-word", o => o, () =>
+            {
+                if (ex.UseAudio) _app.Audio.Play(ex.Word.AudioId);
+            });
+        }
+
+        /// <summary>A Russian sentence with the known sounds in Armenian letters; the plain text can be revealed.</summary>
+        void ShowMixedText(Exercise ex)
+        {
+            _body.Add(Ui.Label("Прочитайте вслух", "prompt"));
+            _body.Add(Ui.Label("Армянские буквы — красные и жирные, русские — обычные.", "muted", "center"));
+            _body.Add(Ui.Label(ex.Shown, "mixed-text"));
+            var plain = Ui.Label(ex.Answer, "body", "center", "plain-text");
+            plain.style.display = DisplayStyle.None;
+            _body.Add(Ui.Button("Проверить себя", () => plain.style.display = DisplayStyle.Flex, "btn-ghost", "small"));
+            _body.Add(plain);
+            SetFooter(null, "Дальше", Next);
         }
 
         void ShowListenPick(Exercise ex)
@@ -309,6 +339,12 @@ namespace Aib.UI
             foreach (var line in lines)
                 _body.Add(Ui.Label(line, "body", "center"));
             SetFooter(null, "На главную", _app.ShowHome);
+            if (_plan.Next != null)
+            {
+                _footer.Q<Button>().RemoveFromClassList("btn-primary");
+                _footer.Q<Button>().AddToClassList("btn-secondary");
+                _footer.Insert(0, Ui.Button(_plan.NextLabel, _plan.Next, "btn-primary", "wide"));
+            }
         }
 
         void ClearBody()

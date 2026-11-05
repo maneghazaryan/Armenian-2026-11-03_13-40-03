@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 
 namespace Aib.Data
 {
@@ -26,6 +27,65 @@ namespace Aib.Data
                 }
             }
             return tokens;
+        }
+
+        public static bool IsArmenian(char c) => c >= '\u0531' && c <= '\u058A';
+
+        // Russian sound -> Armenian letter. Russian т/п/к/ч are unaspirated, like տ/պ/կ/ճ.
+        static readonly Dictionary<char, string> RussianToArmenian = new Dictionary<char, string>
+        {
+            ['а'] = "ա", ['б'] = "բ", ['в'] = "վ", ['г'] = "գ", ['д'] = "դ", ['е'] = "ե", ['ж'] = "ժ",
+            ['з'] = "զ", ['и'] = "ի", ['й'] = "յ", ['к'] = "կ", ['л'] = "լ", ['м'] = "մ", ['н'] = "ն",
+            ['о'] = "ո", ['п'] = "պ", ['р'] = "ր", ['с'] = "ս", ['т'] = "տ", ['у'] = "ու", ['ф'] = "ֆ",
+            ['х'] = "խ", ['ц'] = "ծ", ['ч'] = "ճ", ['ш'] = "շ", ['э'] = "է",
+        };
+
+        /// <summary>
+        /// Writes the sounds of a Russian text that the learner can already read with Armenian letters:
+        /// «Сирена запела» with ս ա ր known → «Սиրенա запелա». ո follows its reading rule
+        /// («во» at the start of a word, «о» inside), and «ев» inside a word becomes և.
+        /// </summary>
+        public static string MixRussian(string text, ISet<string> known)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                char lower = char.ToLowerInvariant(c);
+                bool upper = c != lower;
+                bool wordStart = i == 0 || !char.IsLetter(text[i - 1]);
+                string hy = null;
+                int used = 1;
+
+                if (wordStart && lower == 'в' && i + 1 < text.Length && char.ToLowerInvariant(text[i + 1]) == 'о' && known.Contains("ո"))
+                {
+                    hy = "ո";
+                    used = 2;
+                }
+                else if (!wordStart && lower == 'е' && i + 1 < text.Length && text[i + 1] == 'в' && known.Contains("և"))
+                {
+                    hy = "և";
+                    used = 2;
+                }
+                else if (lower == 'о' && wordStart)
+                {
+                    // ո at the start of a word reads «во»; a plain «о» there is օ (or stays Russian until օ is known).
+                    hy = known.Contains("օ") ? "օ" : null;
+                }
+                else if (RussianToArmenian.TryGetValue(lower, out var mapped) && known.Contains(mapped))
+                {
+                    hy = mapped;
+                }
+
+                if (hy == null)
+                {
+                    sb.Append(c);
+                    continue;
+                }
+                sb.Append(upper ? Capitalize(hy) : hy);
+                i += used - 1;
+            }
+            return sb.ToString();
         }
 
         /// <summary>First letter capital, as at the start of a sentence: ասա → Ասա, ու → Ու, և → Եվ.</summary>
