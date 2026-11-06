@@ -18,7 +18,7 @@ namespace Aib.UI
 
             var done = app.Course.Lessons.Where(l => app.Progress.Result(l.day) != null).ToList();
             var scroll = Ui.Scroll("grow");
-            if (done.Count == 0)
+            if (done.Count == 0 && app.Progress.items.Count == 0)
                 scroll.Add(Ui.Label("Здесь появятся слова, фразы и стихи из пройденных уроков.", "muted", "center"));
             else
                 scroll.Add(Ui.Label("Сначала прочитайте слово сами, потом нажмите, чтобы проверить себя.", "muted", "center"));
@@ -26,6 +26,11 @@ namespace Aib.UI
             AddSection(app, scroll, "Слова", done.SelectMany(l => l.words));
             AddSection(app, scroll, "Фразы", done.SelectMany(l => l.phrases));
             AddSection(app, scroll, "Стихи", done.SelectMany(l => l.verses));
+            // Words the learner added while reading Armenian texts.
+            AddSection(app, scroll, "Слова из текстов", app.Progress.items
+                .Where(i => i.key.StartsWith("d:"))
+                .Select(i => app.Course.ByKey(i.key) as WordData)
+                .Where(w => w != null));
             Add(scroll);
         }
 

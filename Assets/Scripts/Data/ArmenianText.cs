@@ -13,7 +13,8 @@ namespace Aib.Data
         public static List<string> Tokenize(string text)
         {
             var tokens = new List<string>();
-            text = text.ToLowerInvariant();
+            // Stress, question and exclamation marks sit inside words (Ինչո՞ւ): ignore them.
+            text = text.ToLowerInvariant().Replace("՛", "").Replace("՜", "").Replace("՞", "");
             for (int i = 0; i < text.Length; i++)
             {
                 if (text[i] == 'ո' && i + 1 < text.Length && text[i + 1] == 'ւ')
@@ -152,6 +153,47 @@ namespace Aib.Data
         }
 
         static bool IsVowelOrSign(char c) => Vowels.IndexOf(c) >= 0 || c == 'ь' || c == 'ъ';
+
+        static readonly Dictionary<char, string> Sounds = new Dictionary<char, string>
+        {
+            ['ա'] = "а", ['բ'] = "б", ['գ'] = "г", ['դ'] = "д", ['զ'] = "з", ['է'] = "э", ['ը'] = "ə",
+            ['թ'] = "тʰ", ['ժ'] = "ж", ['ի'] = "и", ['լ'] = "л", ['խ'] = "х", ['ծ'] = "ц", ['կ'] = "к",
+            ['հ'] = "h", ['ձ'] = "дз", ['ղ'] = "гх", ['ճ'] = "ч", ['մ'] = "м", ['յ'] = "й", ['ն'] = "н",
+            ['շ'] = "ш", ['չ'] = "чʰ", ['պ'] = "п", ['ջ'] = "дж", ['ռ'] = "рр", ['ս'] = "с", ['վ'] = "в",
+            ['տ'] = "т", ['ր'] = "р", ['ց'] = "цʰ", ['ւ'] = "в", ['փ'] = "пʰ", ['ք'] = "кʰ", ['օ'] = "о",
+            ['ֆ'] = "ф",
+        };
+
+        /// <summary>
+        /// Reading of an Armenian word in Cyrillic, in the course's notation (ʰ — with a breath,
+        /// «гх» — ղ, ə — ը): ե is «е» at the start and after a vowel, «э» after a consonant;
+        /// ո at the start is «во»; յա/յու are «я/ю». The ը heard but not written is not shown.
+        /// </summary>
+        public static string Transcribe(string hy)
+        {
+            var sb = new StringBuilder();
+            string w = hy.ToLowerInvariant();
+            bool prevVowel = false, start = true;
+            for (int i = 0; i < w.Length; i++)
+            {
+                char c = w[i];
+                string next2 = i + 2 < w.Length ? w.Substring(i + 1, 2) : (i + 1 < w.Length ? w.Substring(i + 1, 1) : "");
+                string sound;
+                bool vowel;
+                if (c == 'ո' && i + 1 < w.Length && w[i + 1] == 'ւ') { sound = "у"; vowel = true; i++; }
+                else if (c == 'յ' && next2.StartsWith("ու")) { sound = "ю"; vowel = true; i += 2; }
+                else if (c == 'յ' && next2.StartsWith("ա")) { sound = "я"; vowel = true; i++; }
+                else if (c == 'ե') { sound = start || prevVowel ? "е" : "э"; vowel = true; }
+                else if (c == 'ո') { sound = start ? "во" : "о"; vowel = true; }
+                else if (c == 'և') { sound = start ? "ев" : "эв"; vowel = false; }
+                else if (Sounds.TryGetValue(c, out var s)) { sound = s; vowel = "աէըիօյ".IndexOf(c) >= 0; } // ե after յ reads «е»
+                else { sb.Append(c); start = !char.IsLetter(c); prevVowel = false; continue; }
+                sb.Append(sound);
+                prevVowel = vowel;
+                start = false;
+            }
+            return sb.ToString();
+        }
 
         /// <summary>First letter capital, as at the start of a sentence: ասա → Ասա, ու → Ու, և → Եվ.</summary>
         public static string Capitalize(string word)

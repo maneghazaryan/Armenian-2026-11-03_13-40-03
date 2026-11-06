@@ -23,6 +23,8 @@ namespace Aib.UI
         public AudioService Audio { get; private set; }
         /// <summary>Interesting facts for the reading section.</summary>
         public List<ReadingText> Reading { get; private set; }
+        /// <summary>Stories, poems and songs in Armenian, for after the alphabet.</summary>
+        public List<HyText> HyTexts { get; private set; }
 
         /// <summary>Layout is designed for 1280 units of height and 720 of width (portrait).</summary>
         static readonly Vector2Int Reference = new Vector2Int(720, 1280);
@@ -47,8 +49,11 @@ namespace Aib.UI
             Application.targetFrameRate = 60;
             Course = Course.FromJson(
                 Resources.Load<TextAsset>("Data/letters").text,
-                Resources.Load<TextAsset>("Data/lessons").text);
+                Resources.Load<TextAsset>("Data/lessons").text,
+                Resources.Load<TextAsset>("Data/words").text);
+            Course.Dictionary = ArmenianDictionary.Parse(Resources.Load<TextAsset>("Data/dictionary").text);
             Reading = ReadingText.ListFromJson(Resources.Load<TextAsset>("Data/reading").text);
+            HyTexts = HyText.ListFromJson(Resources.Load<TextAsset>("Data/texts_hy").text);
             Progress = ProgressStore.Load();
             Progress.Prune(key => Course.ByKey(key) != null);
             Audio = gameObject.AddComponent<AudioService>();
@@ -141,6 +146,30 @@ namespace Aib.UI
 
         public void ShowReadingText(ReadingText text) => Show(new ReadingScreen(this, text));
 
+        public void ShowHyTexts() => Show(new HyReadingScreen(this));
+
+        public void ShowHyText(HyText text) => Show(new HyReadingScreen(this, text));
+
+        /// <summary>All letter days passed: the Armenian texts are open.</summary>
+        public bool AlphabetDone => Course.Lessons.Where(l => !l.IsWordsDay).All(l => Progress.Result(l.day) != null);
+
+        /// <summary>
+        /// Dictionary words the learner knows: words of passed days and words added to training.
+        /// Course words count by their written form, so «մայր» learned on day 11 is known in texts.
+        /// </summary>
+        public HashSet<string> KnownWords()
+        {
+            var known = new HashSet<string>();
+            foreach (var item in Progress.items)
+                if (Course.ByKey(item.key) is WordData w)
+                    known.Add(w.hy.ToLowerInvariant());
+            return known;
+        }
+
+        /// <summary>Words of a text the learner does not know yet (names don't count).</summary>
+        public int UnknownWords(HyText text, HashSet<string> known) =>
+            Course.Dictionary.WordsOf(text.text, text.id).Count(e => !e.IsName && !known.Contains(e.hy.ToLowerInvariant()));
+
         /// <summary>Letters met so far: those of finished days and of a day whose first part is done.</summary>
         public HashSet<string> KnownGlyphs()
         {
@@ -168,7 +197,9 @@ namespace Aib.UI
                 ? lesson.intro
                 : part == 2
                     ? "Те же слова — новые упражнения. Если слово забылось, нажмите «Подсказка»."
-                    : "Знакомые русские слова, в которых звуки, уже известные вам, записаны армянскими буквами. Армянские буквы — красные и жирные. Прочитайте вслух, потом проверьте себя.";
+                    : lesson.IsWordsDay
+                        ? "Фразы с новыми словами: прочитайте вслух, потом проверьте себя. В конце — каждое слово ещё раз."
+                        : "Знакомые русские слова, в которых звуки, уже известные вам, записаны армянскими буквами. Армянские буквы — красные и жирные. Прочитайте вслух, потом проверьте себя.";
 
             Show(new LessonScreen(this, new LessonPlan
             {
@@ -192,10 +223,10 @@ namespace Aib.UI
                     return new[]
                     {
                         $"День {day} пройден!",
-                        "Новые буквы: " + string.Join("  ", lesson.newLetters.Select(id => Course.Letter(id).lower)),
+                        lesson.IsWordsDay ? null : "Новые буквы: " + string.Join("  ", lesson.newLetters.Select(id => Course.Letter(id).lower)),
                         "Новые слова: " + string.Join(", ", lesson.words.Select(w => w.hy)),
                         "Завтра повторим их, чтобы они запомнились.",
-                    };
+                    }.Where(line => line != null).ToArray();
                 },
             }));
         }
@@ -281,6 +312,14 @@ namespace Aib.UI
         {
             Progress.UnlockAll(Course.Lessons.Select(l => (l.day,
                 l.newLetters.Select(id => Course.Letter(id).Key).Concat(l.words.Select(w => w.Key)))), DateTime.Now);
+            SaveProgress();
+            ShowHome();
+        }
+
+        /// <summary>Starts the course over. The settings (one lesson a day, reminders) stay.</summary>
+        public void ResetProgress()
+        {
+            Progress.Reset();
             SaveProgress();
             ShowHome();
         }

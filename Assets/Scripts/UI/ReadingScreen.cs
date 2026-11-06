@@ -40,6 +40,12 @@ namespace Aib.UI
                 : $"Интересные факты о мире. Звуки, которые вы уже знаете (букв: {known}), записаны армянскими буквами. Чем больше букв вы выучите, тем больше армянского будет в текстах.",
                 "muted", "center"));
 
+            // Real Armenian texts: open once the whole alphabet is learned.
+            if (_app.AlphabetDone)
+                scroll.Add(Ui.Button("📖  Армянские тексты: сказки, стихи и песни ›", _app.ShowHyTexts, "btn-primary", "wide", "hy-entry"));
+            else
+                scroll.Add(Ui.Label("🔒  Армянские сказки, стихи и песни откроются, когда вы выучите все буквы.", "locked-note", "wrap"));
+
             var content = Ui.Box("reading-list"); // two columns in landscape
             foreach (var topic in _app.Reading.GroupBy(t => t.topic))
             {

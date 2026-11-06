@@ -21,7 +21,8 @@ namespace Aib.UI
             int learned = app.Course.Lessons
                 .Where(l => app.Progress.Result(l.day) != null)
                 .Sum(l => l.newLetters.Count);
-            header.Add(Ui.Label($"Изучено букв: {learned} из {app.Course.Letters.Count}", "muted"));
+            int words = app.Progress.items.Count(i => !i.key.StartsWith("l:"));
+            header.Add(Ui.Label($"Изучено букв: {learned} из {app.Course.Letters.Count}" + (words > 0 ? $" · слов: {words}" : ""), "muted"));
             Add(header);
 
             var scroll = Ui.Scroll("grow");
@@ -45,14 +46,22 @@ namespace Aib.UI
 
             foreach (var lesson in app.Course.Lessons)
             {
+                // After the alphabet: a new set of words every day.
+                if (lesson.day == app.Course.AlphabetDays + 1)
+                {
+                    list.Add(Ui.Label("Слова на каждый день", "section-title", "full-row"));
+                    list.Add(Ui.Label("Алфавит выучен — дальше каждый день новые слова и их повторение.", "muted", "full-row"));
+                }
                 var state = DayUnlock.State(lesson.day, app.Progress, today);
                 var card = Ui.Box("day-card", "day-" + state.ToString().ToLowerInvariant());
 
-                var letters = string.Join("  ", lesson.newLetters.Select(id =>
-                {
-                    var l = app.Course.Letter(id);
-                    return l.upper + " " + l.lower;
-                }));
+                var letters = lesson.IsWordsDay
+                    ? string.Join(", ", lesson.words.Take(3).Select(w => w.hy)) + "…"
+                    : string.Join("  ", lesson.newLetters.Select(id =>
+                    {
+                        var l = app.Course.Letter(id);
+                        return l.upper + " " + l.lower;
+                    }));
                 var text = Ui.Box("grow");
                 text.Add(Ui.Label($"День {lesson.day} · {lesson.title}", "day-title"));
                 text.Add(Ui.Label(letters, "day-letters"));
@@ -91,7 +100,7 @@ namespace Aib.UI
             footer.Add(Ui.Button("Чтение", app.ShowReading, "btn-secondary", "grow", "gap-left"));
             Add(footer);
 
-            var settings = Ui.Box("footer");
+            var settings = Ui.Box("footer", "settings");
             if (Reminders.Supported)
                 settings.Add(Ui.Button("🔔 " + Reminders.Label(app.Progress.reminderHour), () =>
             {
@@ -112,6 +121,20 @@ namespace Aib.UI
                 });
                 settings.Add(dayLock);
             }
+            // Start over. Asks once more before doing it.
+            if (app.Progress.results.Count > 0 || app.Progress.items.Count > 0 || app.Progress.partial.Count > 0)
+            {
+                Button reset = null;
+                bool asked = false;
+                reset = Ui.Button("Сбросить прогресс", () =>
+                {
+                    if (asked) { app.ResetProgress(); return; }
+                    asked = true;
+                    reset.text = "Начать заново? Всё пройденное забудется. Нажмите ещё раз";
+                }, "btn-ghost", "small");
+                settings.Add(reset);
+            }
+
             // For testers: open everything at once. Asks once more before doing it.
             if (app.Course.Lessons.Any(l => app.Progress.Result(l.day) == null))
             {

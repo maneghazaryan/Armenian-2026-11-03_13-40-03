@@ -105,6 +105,19 @@ namespace Aib.Progress
             }
         }
 
+        /// <summary>Starts over: forgets days, reviews, mistakes and read texts. Settings stay.</summary>
+        public void Reset()
+        {
+            results.Clear();
+            items.Clear();
+            partial.Clear();
+            misses.Clear();
+            read.Clear();
+        }
+
+        /// <summary>True when the letter or word is in training (learned on a day or added from a text).</summary>
+        public bool IsLearning(string key) => items.Any(i => i.key == key);
+
         /// <summary>Count a wrong answer for each of these letters or words.</summary>
         public void Missed(IEnumerable<string> keys)
         {

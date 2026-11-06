@@ -11,6 +11,10 @@ letters a day, and from day 1 you read real words made only of the letters you k
   home screen, the next lesson opens right away. Either way today's review comes first.
 - **The whole alphabet in 17 days:** ս ա ր · մ ի · ն ե · ո տ · ու լ · կ վ է · բ և · պ դ ·
   գ զ · շ ժ · հ յ · խ ղ · թ ք փ · ծ ց · ճ չ ջ · ռ ձ ը · օ ֆ.
+- **After the alphabet: new words every day.** Days 18–32 (`words.json`) each bring 7–9
+  everyday words on one theme (family, numbers, colours, food, home, body, time, weather,
+  animals, town, verbs, adjectives, questions, clothes, school and work) with two phrases.
+  They open one a day like the letter days; part 3 reads the phrases and checks every word.
 - **Spaced review (Leitner boxes).** Every learned letter and word comes back after 1, 3, 7,
   14 and 30 days; a mistake sends it back to "tomorrow". At most 12 items per day.
   «Повторение» is always on the home screen once something is learned: today's due items, or,
@@ -20,6 +24,15 @@ letters a day, and from day 1 you read real words made only of the letters you k
   checked against sources, in Russian with every sound the learner already knows written in
   Armenian letters. The more letters learned, the more Armenian the text shows; «Показать
   по-русски» switches to plain Russian. Texts live in `Assets/Resources/Data/reading.json`.
+- **Armenian texts (after the alphabet).** «Чтение» → «Армянские тексты»: Tumanyan's tales
+  retold simply (Ծիտը, Անխելք մարդը, Կիկոսի մահը, Անբան Հուռին) and in the original, three short
+  stories written for the app, Tumanyan's quatrains, Charents's «Ես իմ անուշ Հայաստանի», the
+  anthem «Մեր Հայրենիք» and the songs «Կիլիկիա» and «Կռունկ» (first stanzas, modern spelling).
+  All are in the public domain; originals come from Armenian Wikisource. Any word can be tapped:
+  how it reads, what this form means, its dictionary form, and «Учить» adds it to the daily
+  review. Words the learner doesn't know yet are red. The list is sorted by the number of
+  unknown words (words of passed days and words added from texts count as known) and grouped
+  by that number: up to 25, up to 60, more.
 - **Russian «р».** In mixed texts ր is used only for the soft «р» before и е ё ю я ь («сирена»,
   «пример»). Every hard «р» («рама», «красиво», «размер», «терраса») is ռ and stays Russian until
   ռ is learned. Names written with ր in Armenian («Сахара», unlike «сахар») are listed as exceptions.
@@ -59,6 +72,9 @@ letters a day, and from day 1 you read real words made only of the letters you k
 - **Dictionary (Словарь):** all words, phrases and verses from completed days; read first, tap
   to see the meaning. Words with mistakes are highlighted until two reviews in a row go well
   (the alphabet marks such letters too).
+- **Start over:** «Сбросить прогресс» on the home screen (tap twice) forgets all days, reviews
+  and read texts; the settings stay. «Открыть все уроки» (tap twice) is for testers: it marks
+  every day as passed.
 - **Daily reminders:** local notifications (no server) at 9, 13, 19 or 21 h, or off.
 - Progress is saved on the device (`progress.json` in `Application.persistentDataPath`).
 
@@ -67,11 +83,15 @@ letters a day, and from day 1 you read real words made only of the letters you k
 |---|---|
 | `Assets/Resources/Data/letters.json` | alphabet: glyphs, name, Russian sound, `look` (shape association), tip, warning, `more` (deep explanation) |
 | `Assets/Resources/Data/lessons.json` | day-by-day lessons: new letters, words, phrases, verses |
+| `Assets/Resources/Data/words.json` | word days after the alphabet (same format, no `newLetters`) |
+| `Assets/Resources/Data/texts_hy.json` | Armenian stories, poems and songs (`id`, `kind`, `title`, `author`, `note`, `emoji`, `text`; empty line = new paragraph or stanza) |
+| `Assets/Resources/Data/dictionary.txt` | every word of the Armenian texts: `слово = значение \| форма = значение формы; форма`; lines under `[text-id]` apply only to that text (dialect) |
 | `Assets/Resources/Audio/` | `l_<letterId>.mp3` and `w_<wordId>.mp3` clips (optional) |
 | `Assets/Resources/Fonts/` | Noto Sans, Noto Sans Armenian, Symbols 2, Noto Emoji (SIL OFL) |
 | `Assets/Resources/UI/App.uss` | all styles |
 | `Assets/Scripts/` | `Data/` course model, `Lesson/` exercise builder and session, `Progress/` unlocking and saving, `UI/` screens |
-| `Tools/validate_course.py` | checks that every word uses only letters learned by that day |
+| `Tools/validate_course.py` | checks that every word uses only letters learned by that day, and that the dictionary covers every Armenian text |
+| `Tools/gen_icon.py` | renders the app icon and the web favicons |
 | `Tools/gen_glyphs.py` | renders the letter samples and masks for the drawing exercises into `Assets/Resources/Glyphs/` (needs Pillow; rerun after changing the font or `letters.json`) |
 | `Tools/gen_audio.py` | generates missing audio clips |
 
@@ -105,6 +125,11 @@ Update the site: copy `Build/Web` into a clone of `maneghazaryan/ayb` (keep `.no
 1. Add an entry to `lessons.json` (next `day`, `newLetters` by letter `id`, `words` with an optional `note`, `phrases`, and Russian `texts` for the reading part — the app writes their known sounds in Armenian letters itself).
 2. Run `python3 Tools/validate_course.py`. It must report 0 errors.
 
+## Adding an Armenian text
+1. Add it to `texts_hy.json`.
+2. Run `python3 Tools/validate_course.py`: it lists the words missing from `dictionary.txt`.
+   Add them (a new form goes after «|» of its dictionary word), until there are 0 errors.
+
 ## Audio
 Without audio the app still works; listening exercises are just skipped.
 Two free ways to add it (files with the same name are never overwritten):
@@ -124,6 +149,7 @@ Unity -batchmode -projectPath . -runTests -testPlatform EditMode -testResults re
 ## Roadmap
 1. ✅ Reading MVP: days 1–7 (16 letters), spaced review, dictionary, reminders.
 2. ✅ Full alphabet: days 8–17 (39 letters).
-3. Verses, audio, record-and-compare speaking practice.
-4. Optional AI tutor (Google Gemini free tier behind a free Cloudflare Worker) that explains
+3. ✅ Words every day after the alphabet (days 18–32), Armenian texts with a tap-to-translate dictionary.
+4. Audio, record-and-compare speaking practice; a native speaker's check of the texts' glosses.
+5. Optional AI tutor (Google Gemini free tier behind a free Cloudflare Worker) that explains
    grammar in Russian using only the letters you have learned.

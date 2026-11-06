@@ -11,9 +11,17 @@ namespace Aib.Tests
 {
     public class CourseTests
     {
-        static Course LoadCourse() => Course.FromJson(
-            Resources.Load<TextAsset>("Data/letters").text,
-            Resources.Load<TextAsset>("Data/lessons").text);
+        static Course LoadCourse()
+        {
+            var course = Course.FromJson(
+                Resources.Load<TextAsset>("Data/letters").text,
+                Resources.Load<TextAsset>("Data/lessons").text,
+                Resources.Load<TextAsset>("Data/words").text);
+            course.Dictionary = ArmenianDictionary.Parse(Resources.Load<TextAsset>("Data/dictionary").text);
+            return course;
+        }
+
+        static List<HyText> LoadHyTexts() => HyText.ListFromJson(Resources.Load<TextAsset>("Data/texts_hy").text);
 
         [Test]
         public void Tokenize_TreatsUAndEvAsSingleLetters()
@@ -468,6 +476,129 @@ namespace Aib.Tests
             Assert.AreEqual(0, p.partial.Count);
             Assert.AreEqual(course.Letters.Count + course.Lessons.Sum(l => l.words.Count), p.items.Count);
             Assert.AreEqual(0, p.Due(today).Count);
+        }
+
+        [Test]
+        public void WordDays_FollowTheAlphabet_AndTeachOnlyWords()
+        {
+            var course = LoadCourse();
+            Assert.AreEqual(17, course.AlphabetDays);
+            var wordDays = course.Lessons.Where(l => l.IsWordsDay).ToList();
+            Assert.GreaterOrEqual(wordDays.Count, 10);
+            Assert.IsTrue(wordDays.All(l => l.day > course.AlphabetDays && l.words.Count >= 5));
+            CollectionAssert.AreEqual(Enumerable.Range(1, course.Lessons.Count), course.Lessons.Select(l => l.day));
+
+            var all = course.Lessons.SelectMany(l => l.words).ToList();
+            Assert.AreEqual(all.Count, all.Select(w => w.hy).Distinct().Count(), "a word is taught twice");
+            Assert.AreEqual(all.Count, all.Select(w => w.id).Distinct().Count());
+
+            foreach (var lesson in wordDays)
+            {
+                var part1 = ExerciseBuilder.Build(course, lesson, 1, _ => false, 1);
+                Assert.IsFalse(part1.Any(e => e.Letter != null), $"day {lesson.day}");
+                Assert.AreEqual(lesson.words.Count, part1.Count(e => e.Kind == ExerciseKind.WordIntro));
+                var part3 = ExerciseBuilder.Build(course, lesson, 3, _ => false, 1);
+                Assert.AreEqual(lesson.phrases.Count, part3.Count(e => e.Kind == ExerciseKind.Phrase));
+                CollectionAssert.AreEquivalent(lesson.words, part3.Where(e => e.Kind == ExerciseKind.MeaningPickWord).Select(e => e.Word));
+            }
+        }
+
+        [Test]
+        public void Dictionary_CoversEveryWordOfEveryArmenianText()
+        {
+            var course = LoadCourse();
+            CollectionAssert.IsEmpty(course.Dictionary.Problems);
+            var texts = LoadHyTexts();
+            Assert.GreaterOrEqual(texts.Count, 12);
+            Assert.AreEqual(texts.Count, texts.Select(t => t.id).Distinct().Count());
+            foreach (var text in texts)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(text.title + text.kind + text.author + text.note), text.id);
+                foreach (var chunk in ArmenianDictionary.Chunks(text.text))
+                    foreach (var (word, form) in course.Dictionary.Lookup(chunk, text.id))
+                        Assert.IsNotNull(form, $"{text.id}: «{word}» is not in the dictionary");
+            }
+        }
+
+        [Test]
+        public void Dictionary_FindsFormsTextSectionsAndHyphenParts()
+        {
+            var dict = ArmenianDictionary.Parse(
+                "մարդ = человек | մարդու = человека; մարդիկ = люди\n" +
+                "մեր = наш\n" +
+                "գիշեր = ночь\nցերեկ = день\n" +
+                "Կիկոս = Кикос (имя)\n" +
+                "[kikos]\nմայր = мать | մեր = мать (диал.); в «մեր տունը» — наш\n");
+            CollectionAssert.IsEmpty(dict.Problems);
+            var f = dict.Find("Մարդու,", null);
+            Assert.AreEqual("մարդ", f.Entry.hy);
+            Assert.AreEqual("человека", f.Note);
+            Assert.AreEqual("наш", dict.Find("մեր", "other").Entry.ru);
+            Assert.AreEqual("մայր", dict.Find("մեր", "kikos").Entry.hy);
+            Assert.AreEqual("մարդ", dict.Find("մա՛րդ", null).Entry.hy);
+            var parts = dict.Lookup("գիշեր-ցերեկ,", null);
+            CollectionAssert.AreEqual(new[] { "գիշեր", "ցերեկ" }, parts.Select(p => p.form.Entry.hy));
+            Assert.IsTrue(dict.Find("Կիկոս", null).Entry.IsName);
+            Assert.AreEqual(3, dict.WordsOf("Մարդիկ ու մարդ, գիշեր — Կիկոս։ բան", null).Count);
+        }
+
+        [Test]
+        public void ArmenianTexts_GetEasierAsWordsAreLearned()
+        {
+            var course = LoadCourse();
+            var text = LoadHyTexts().First(t => t.id == "family");
+            int Unknown(HashSet<string> known) => course.Dictionary.WordsOf(text.text, text.id)
+                .Count(e => !e.IsName && !known.Contains(e.hy.ToLowerInvariant()));
+            var none = new HashSet<string>();
+            var some = course.Lessons.SelectMany(l => l.words).Select(w => w.hy.ToLowerInvariant()).ToHashSet();
+            Assert.Less(Unknown(some), Unknown(none));
+            // Original tales have far more new words than the retold ones.
+            var texts = LoadHyTexts();
+            int Count(string id) => course.Dictionary.WordsOf(texts.First(t => t.id == id).text, id).Count;
+            Assert.Greater(Count("anxelq"), Count("anxelq_easy") * 2);
+        }
+
+        [Test]
+        public void WordsFromTexts_CanBeTrained()
+        {
+            var course = LoadCourse();
+            var word = course.ByKey("d:աղքատ") as WordData;
+            Assert.IsNotNull(word);
+            Assert.AreEqual("d:աղքատ", word.Key);
+            Assert.AreSame(word, course.ByKey("d:աղքատ"));
+            Assert.AreEqual("агхкʰат", word.tr);
+            Assert.IsNull(course.ByKey("d:нет-такого"));
+            var review = ExerciseBuilder.BuildReview(course, new[] { "d:աղքատ", "w:sar" }, 17, _ => false, 1);
+            Assert.AreEqual(2, review.Count);
+            Assert.IsTrue(review.All(e => e.Answer != null));
+        }
+
+        [Test]
+        public void Transcribe_ReadsArmenianInCyrillic()
+        {
+            Assert.AreEqual("hаястан", ArmenianText.Transcribe("Հայաստան"));
+            Assert.AreEqual("əнкэр", ArmenianText.Transcribe("ընկեր"));
+            Assert.AreEqual("ворди", ArmenianText.Transcribe("որդի"));
+            Assert.AreEqual("шнорhакалутʰюн", ArmenianText.Transcribe("շնորհակալություն"));
+            Assert.AreEqual("hайерэн", ArmenianText.Transcribe("հայերեն"));
+            Assert.AreEqual("ерэван", ArmenianText.Transcribe("Երևան"));
+        }
+
+        [Test]
+        public void Reset_ForgetsProgressButKeepsSettings()
+        {
+            var today = new DateTime(2026, 11, 7);
+            var p = new ProgressData { dayLock = false, reminderHour = 8 };
+            p.Complete(1, 3, today);
+            p.Learn(new[] { "l:s", "d:մարդ" }, today);
+            p.CompletePart(2, 1, ExerciseBuilder.Parts, 1, today);
+            p.Missed(new[] { "l:s" });
+            p.MarkRead("hy:family");
+            p.Reset();
+            Assert.AreEqual(0, p.results.Count + p.items.Count + p.partial.Count + p.misses.Count + p.read.Count);
+            Assert.IsFalse(p.dayLock);
+            Assert.AreEqual(8, p.reminderHour);
+            Assert.AreEqual(DayState.Available, DayUnlock.State(1, p, today));
         }
     }
 }

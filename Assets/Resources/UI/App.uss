@@ -222,3 +222,27 @@
 .landscape .reading-list { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
 .landscape .reading-list > .reading-item { width: 49.5%; }
 .landscape .reading-page { max-width: 1100px; align-self: center; }
+
+/* ---------- Armenian texts ---------- */
+.settings { flex-wrap: wrap; justify-content: center; }
+.hy-entry { margin: 12px 0 4px 0; }
+.locked-note { font-size: 26px; color: #8A8794; background-color: #F3EEE8; border-radius: 18px; padding: 18px 22px; margin: 12px 0 4px 0; }
+.hy-item { flex-direction: column; align-items: stretch; }
+.hy-item-title { font-size: 32px; -unity-font-style: bold; color: #B5332E; white-space: normal; }
+.hy-item.read .hy-item-title { color: #8A8794; }
+.hy-legend { font-size: 24px; color: #8A8794; -unity-text-align: middle-center; margin: 8px 0 12px 0; }
+.hy-block { margin: 10px 0 18px 0; }
+.hy-line { flex-direction: row; flex-wrap: wrap; }
+.hy-word { font-size: 36px; color: #2B2A33; margin: 2px 12px 2px 0; padding: 0; border-radius: 8px; }
+.hy-word.unknown { color: #B5332E; }
+.hy-word:hover { background-color: rgba(242, 140, 56, 0.15); }
+.word-popup {
+    position: absolute; left: 16px; right: 16px; bottom: 16px;
+    background-color: #FFFFFF; border-radius: 24px; padding: 24px 28px;
+    border-width: 2px; border-color: #F28C38;
+}
+.landscape .word-popup { left: 25%; right: 25%; }
+.popup-close { position: absolute; top: 6px; right: 6px; font-size: 30px; }
+.popup-word { font-size: 40px; -unity-font-style: bold; margin-right: 48px; white-space: normal; }
+.popup-meaning { font-size: 32px; margin: 6px 0; }
+.popup-known { font-size: 26px; color: #3E8E5E; margin: 6px 0; }

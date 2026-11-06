@@ -50,6 +50,8 @@ namespace Aib.Lesson
     /// 1. new letters and words, first practice;
     /// 2. more practice with the same words;
     /// 3. reading: Russian texts written partly in Armenian letters, then Armenian phrases.
+    /// Word days after the alphabet have no letters: part 1 meets the words, part 3 reads phrases
+    /// with them and checks each word once more.
     /// </summary>
     public static class ExerciseBuilder
     {
@@ -84,7 +86,8 @@ namespace Aib.Lesson
                         letterQuizzes.Add(PickLetter(course.Letter(id), known, hasAudio, rng));
                         letterQuizzes.Add(MatchCase(course.Letter(id), known, rng));
                     }
-                    var older = known.Where(l => !lesson.newLetters.Contains(l.id));
+                    // Word days after the alphabet are only about words.
+                    var older = lesson.IsWordsDay ? Enumerable.Empty<LetterData>() : known.Where(l => !lesson.newLetters.Contains(l.id));
                     foreach (var letter in Shuffled(older, rng).Take(OlderCapitals))
                         letterQuizzes.Add(MatchCase(letter, known, rng));
                     result.AddRange(Spread(letterQuizzes, rng));
@@ -127,6 +130,9 @@ namespace Aib.Lesson
                         result.Add(new Exercise { Kind = ExerciseKind.MixedText, Shown = ArmenianText.MixRussian(text, glyphs), Answer = text });
                     foreach (var phrase in lesson.phrases.Concat(lesson.verses))
                         result.Add(new Exercise { Kind = ExerciseKind.Phrase, Word = phrase, UseAudio = hasAudio(phrase.AudioId) });
+                    // A day of new words ends with a check: every word of the day from its meaning.
+                    if (lesson.IsWordsDay)
+                        result.AddRange(Spread(lesson.words.Select(w => MeaningPick(w, knownWords, hasAudio, rng)), rng, after: result.LastOrDefault()));
                     break;
             }
             return result;
