@@ -168,11 +168,17 @@ namespace Aib.Tests
             Assert.AreEqual("окно", ArmenianText.MixRussian("окно", new HashSet<string>()));
             Assert.AreEqual("Օլя", ArmenianText.MixRussian("Оля", course.GlyphsUpTo(17)));
 
-            // ր only for the light «р»; the strong one at the start of a word is ռ, Russian until ռ is known.
+            // ր only for the soft «р» (before и е ё ю я ь); every hard one is ռ, Russian until ռ is known.
             Assert.AreEqual("Рամա", ArmenianText.MixRussian("Рама", course.GlyphsUpTo(2)));
             Assert.AreEqual("Ռամա", ArmenianText.MixRussian("Рама", course.GlyphsUpTo(16)));
-            Assert.AreEqual("Ռուսսկիյ միր", ArmenianText.MixRussian("Русский мир", course.GlyphsUpTo(16)));
+            Assert.AreEqual("Սաрա", ArmenianText.MixRussian("Сара", course.GlyphsUpTo(15)));
+            Assert.AreEqual("Սառա", ArmenianText.MixRussian("Сара", course.GlyphsUpTo(16)));
+            Assert.AreEqual("Ռուսսկիյ միռ", ArmenianText.MixRussian("Русский мир", course.GlyphsUpTo(16)));
             Assert.AreEqual("տեռասա", ArmenianText.MixRussian("терраса", course.GlyphsUpTo(16)));
+            Assert.AreEqual("պրիմեռնո", ArmenianText.MixRussian("примерно", course.GlyphsUpTo(16)));
+            Assert.AreEqual("ռազմեռ", ArmenianText.MixRussian("размер", course.GlyphsUpTo(16)));
+            Assert.AreEqual("Առմենիя", ArmenianText.MixRussian("Армения", course.GlyphsUpTo(16)));
+            Assert.AreEqual("սախառ, Սախարա", ArmenianText.MixRussian("сахар, Сахара", course.GlyphsUpTo(16)));
 
             foreach (var lesson in course.Lessons)
             {

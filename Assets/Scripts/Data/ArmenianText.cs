@@ -40,12 +40,31 @@ namespace Aib.Data
             ['х'] = "խ", ['ц'] = "ծ", ['ч'] = "ճ", ['ш'] = "շ", ['э'] = "է",
         };
 
+        /// <summary>Letters after which Russian «р» is soft.</summary>
+        const string SoftVowels = "иеёюяь";
+
+        /// <summary>Words whose «р» is ր although it is hard in Russian: names written with ր in Armenian (Սահարա).</summary>
+        static readonly HashSet<string> SoftRWords = new HashSet<string>
+        {
+            "Сахара", "Сахары", "Сахаре", "Сахару", "Сахарой",
+        };
+
+        /// <summary>The whole word around position i, as written (case kept).</summary>
+        static string WordAt(string text, int i)
+        {
+            int start = i, end = i;
+            while (start > 0 && char.IsLetter(text[start - 1])) start--;
+            while (end < text.Length && char.IsLetter(text[end])) end++;
+            return text.Substring(start, end - start);
+        }
+
         /// <summary>
         /// Writes the sounds of a Russian text that the learner can already read with Armenian letters:
         /// «Сирена запела» with ս ա ր known → «Սиրенա запелա». ո follows its reading rule
         /// («во» at the start of a word, «о» inside), and «ев» inside a word becomes և.
-        /// Russian «р» is ր only where it is a light tap («сирена», «мир»); the strong «р» at the start
-        /// of a word («рама») and a double «рр» are ռ, and stay Russian until ռ is learned.
+        /// Russian «р» is ր only where it is soft, before и е ё ю я ь («сирена», «пример»). The hard «р»
+        /// everywhere else («рама», «красиво», «размер», «терраса») is the rolled ռ and stays Russian
+        /// until ռ is learned. A few names spelled with ր in Armenian keep it («Сахара», but «сахар» — ռ).
         /// </summary>
         public static string MixRussian(string text, ISet<string> known)
         {
@@ -72,7 +91,9 @@ namespace Aib.Data
                 else if (lower == 'р')
                 {
                     bool doubled = i + 1 < text.Length && char.ToLowerInvariant(text[i + 1]) == 'р';
-                    string letter = wordStart || doubled ? "ռ" : "ր";
+                    char after = i + 1 < text.Length ? char.ToLowerInvariant(text[i + 1]) : ' ';
+                    bool soft = !doubled && (SoftVowels.IndexOf(after) >= 0 || SoftRWords.Contains(WordAt(text, i)));
+                    string letter = soft ? "ր" : "ռ";
                     if (known.Contains(letter))
                     {
                         hy = letter;

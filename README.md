@@ -20,8 +20,9 @@ letters a day, and from day 1 you read real words made only of the letters you k
   checked against sources, in Russian with every sound the learner already knows written in
   Armenian letters. The more letters learned, the more Armenian the text shows; «Показать
   по-русски» switches to plain Russian. Texts live in `Assets/Resources/Data/reading.json`.
-- **Russian «р».** In mixed texts ր is used only for the light tap («сирена», «мир»). The strong
-  «р» at the start of a word («рама») and «рр» are ռ, and stay Russian until ռ is learned.
+- **Russian «р».** In mixed texts ր is used only for the soft «р» before и е ё ю я ь («сирена»,
+  «пример»). Every hard «р» («рама», «красиво», «размер», «терраса») is ռ and stays Russian until
+  ռ is learned. Names written with ր in Armenian («Сахара», unlike «сахар») are listed as exceptions.
 - **Each day has three parts**, opened one after another:
   1. *Lesson* — new letter cards (Russian sound, Russian letter name, a «Как запомнить»
      association that builds on letters already learned, e.g. ի is ր with the stem up, ա is
