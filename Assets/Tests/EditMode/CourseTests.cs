@@ -166,7 +166,7 @@ namespace Aib.Tests
             Assert.AreEqual("Ոտ նոвый մոստ.", ArmenianText.MixRussian("Вот новый мост.", course.GlyphsUpTo(4)));
             Assert.AreEqual("Երևան!", ArmenianText.MixRussian("Ереван!", course.GlyphsUpTo(7)));
             Assert.AreEqual("окно", ArmenianText.MixRussian("окно", new HashSet<string>()));
-            Assert.AreEqual("Օլя", ArmenianText.MixRussian("Оля", course.GlyphsUpTo(17)));
+            Assert.AreEqual("Օլյա", ArmenianText.MixRussian("Оля", course.GlyphsUpTo(17)));
 
             // ր only for the soft «р» (before и е ё ю я ь); every hard one is ռ, Russian until ռ is known.
             Assert.AreEqual("Рամա", ArmenianText.MixRussian("Рама", course.GlyphsUpTo(2)));
@@ -174,11 +174,20 @@ namespace Aib.Tests
             Assert.AreEqual("Սաрա", ArmenianText.MixRussian("Сара", course.GlyphsUpTo(15)));
             Assert.AreEqual("Սառա", ArmenianText.MixRussian("Сара", course.GlyphsUpTo(16)));
             Assert.AreEqual("Ռուսսկիյ միռ", ArmenianText.MixRussian("Русский мир", course.GlyphsUpTo(16)));
-            Assert.AreEqual("տեռասա", ArmenianText.MixRussian("терраса", course.GlyphsUpTo(16)));
+            Assert.AreEqual("ծեռասա", ArmenianText.MixRussian("терраса", course.GlyphsUpTo(16)));
             Assert.AreEqual("պրիմեռնո", ArmenianText.MixRussian("примерно", course.GlyphsUpTo(16)));
             Assert.AreEqual("ռազմեռ", ArmenianText.MixRussian("размер", course.GlyphsUpTo(16)));
-            Assert.AreEqual("Առմենիя", ArmenianText.MixRussian("Армения", course.GlyphsUpTo(16)));
+            Assert.AreEqual("Առմենիյա", ArmenianText.MixRussian("Армения", course.GlyphsUpTo(16)));
             Assert.AreEqual("սախառ, Սախարա", ArmenianText.MixRussian("сахар, Сахара", course.GlyphsUpTo(16)));
+
+            // я ё ю е as յ + vowel; soft т/д are ծ/ձ and then need no յ; ч is չ.
+            var all = course.GlyphsUpTo(17);
+            Assert.AreEqual("Յուռա, յոլկա, պոյոտ, սեմьյա, շոլ", ArmenianText.MixRussian("Юра, ёлка, поёт, семья, шёл", all));
+            Assert.AreEqual("Երևան", ArmenianText.MixRussian("Ереван", all));
+            Assert.AreEqual("Ձիմա, դոժձь, մածь, ծոծա", ArmenianText.MixRussian("Дима, дождь, мать, тётя", all));
+            Assert.AreEqual("դом, տам", ArmenianText.MixRussian("дом, там", new HashSet<string> { "դ", "տ", "ձ", "ծ" }));
+            Assert.AreEqual("չայ", ArmenianText.MixRussian("чай", all));
+            Assert.AreEqual("Дима, мать", ArmenianText.MixRussian("Дима, мать", new HashSet<string>()));
 
             foreach (var lesson in course.Lessons)
             {
@@ -441,6 +450,24 @@ namespace Aib.Tests
             p.MarkRead("octopus");
             Assert.IsTrue(p.IsRead("octopus"));
             Assert.AreEqual(1, p.read.Count);
+        }
+
+        [Test]
+        public void UnlockAll_OpensEveryDayAndKeepsEarnedStars()
+        {
+            var course = LoadCourse();
+            var today = new DateTime(2026, 11, 6);
+            var p = new ProgressData();
+            p.Complete(1, 2, today);
+            p.CompletePart(2, 1, ExerciseBuilder.Parts, 0, today);
+            p.UnlockAll(course.Lessons.Select(l => (l.day,
+                l.newLetters.Select(id => course.Letter(id).Key).Concat(l.words.Select(w => w.Key)))), today);
+
+            Assert.IsTrue(course.Lessons.All(l => DayUnlock.State(l.day, p, today) == DayState.Done));
+            Assert.AreEqual(2, p.Result(1).stars);
+            Assert.AreEqual(0, p.partial.Count);
+            Assert.AreEqual(course.Letters.Count + course.Lessons.Sum(l => l.words.Count), p.items.Count);
+            Assert.AreEqual(0, p.Due(today).Count);
         }
     }
 }

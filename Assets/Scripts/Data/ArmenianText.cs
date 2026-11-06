@@ -31,17 +31,26 @@ namespace Aib.Data
 
         public static bool IsArmenian(char c) => c >= '\u0531' && c <= '\u058A';
 
-        // Russian sound -> Armenian letter. Russian т/п/к/ч are unaspirated, like տ/պ/կ/ճ.
+        // Russian sound -> Armenian letter. Russian т/п/к are unaspirated, like տ/պ/կ; «ч» is exactly չ.
+        // я ё ю (and е after a vowel) are յ + vowel, handled in MixRussian.
         static readonly Dictionary<char, string> RussianToArmenian = new Dictionary<char, string>
         {
             ['а'] = "ա", ['б'] = "բ", ['в'] = "վ", ['г'] = "գ", ['д'] = "դ", ['е'] = "ե", ['ж'] = "ժ",
             ['з'] = "զ", ['и'] = "ի", ['й'] = "յ", ['к'] = "կ", ['л'] = "լ", ['м'] = "մ", ['н'] = "ն",
             ['о'] = "ո", ['п'] = "պ", ['с'] = "ս", ['т'] = "տ", ['у'] = "ու", ['ф'] = "ֆ",
-            ['х'] = "խ", ['ц'] = "ծ", ['ч'] = "ճ", ['ш'] = "շ", ['э'] = "է",
+            ['х'] = "խ", ['ц'] = "ծ", ['ч'] = "չ", ['ш'] = "շ", ['э'] = "է",
         };
 
-        /// <summary>Letters after which Russian «р» is soft.</summary>
+        /// <summary>Letters after which Russian «р», «т», «д» are soft.</summary>
         const string SoftVowels = "иеёюяь";
+
+        const string Vowels = "аеёиоуыэюя";
+
+        /// <summary>я ё ю е as й + vowel: յա յո յու յե.</summary>
+        static readonly Dictionary<char, string> Iotated = new Dictionary<char, string>
+        {
+            ['я'] = "ա", ['ё'] = "ո", ['ю'] = "ու", ['е'] = "ե",
+        };
 
         /// <summary>Words whose «р» is ր although it is hard in Russian: names written with ր in Armenian (Սահարա).</summary>
         static readonly HashSet<string> SoftRWords = new HashSet<string>
@@ -62,6 +71,9 @@ namespace Aib.Data
         /// Writes the sounds of a Russian text that the learner can already read with Armenian letters:
         /// «Сирена запела» with ս ա ր known → «Սиրенա запелա». ո follows its reading rule
         /// («во» at the start of a word, «о» inside), and «ев» inside a word becomes և.
+        /// я ё ю are written յա յո յու, and «е» after a vowel յե (at the start of a word ե already
+        /// reads «йе»). A soft «т» is ծ and a soft «д» is ձ («мать» — Մածь, «Дима» — Ձիմա); the
+        /// vowel after them then drops the յ, since the softness is already written («тётя» — ծոծա).
         /// Russian «р» is ր only where it is soft, before и е ё ю я ь («сирена», «пример»). The hard «р»
         /// everywhere else («рама», «красиво», «размер», «терраса») is the rolled ռ and stays Russian
         /// until ռ is learned. A few names spelled with ր in Armenian keep it («Сахара», but «сахар» — ռ).
@@ -69,6 +81,7 @@ namespace Aib.Data
         public static string MixRussian(string text, ISet<string> known)
         {
             var sb = new StringBuilder();
+            bool softened = false; // the previous letter was a soft т/д written as ծ/ձ
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
@@ -77,6 +90,9 @@ namespace Aib.Data
                 bool wordStart = i == 0 || !char.IsLetter(text[i - 1]);
                 string hy = null;
                 int used = 1;
+                bool wasSoftened = softened;
+                softened = false;
+                char before = wordStart ? ' ' : char.ToLowerInvariant(text[i - 1]);
 
                 if (wordStart && lower == 'в' && i + 1 < text.Length && char.ToLowerInvariant(text[i + 1]) == 'о' && known.Contains("ո"))
                 {
@@ -100,6 +116,20 @@ namespace Aib.Data
                         used = doubled ? 2 : 1;
                     }
                 }
+                else if ((lower == 'т' || lower == 'д') && i + 1 < text.Length
+                         && SoftVowels.IndexOf(char.ToLowerInvariant(text[i + 1])) >= 0
+                         && known.Contains(lower == 'т' ? "ծ" : "ձ"))
+                {
+                    hy = lower == 'т' ? "ծ" : "ձ";
+                    softened = true;
+                }
+                else if (Iotated.TryGetValue(lower, out var vowel) && !(lower == 'е' && (wordStart || !IsVowelOrSign(before))))
+                {
+                    // After ծ/ձ (and ё after ж ш ч щ) the softness is already heard: just the vowel.
+                    bool plain = wasSoftened || (lower == 'ё' && "жшчщ".IndexOf(before) >= 0);
+                    if (known.Contains(vowel) && (plain || known.Contains("յ")))
+                        hy = plain ? vowel : "յ" + vowel;
+                }
                 else if (lower == 'о' && wordStart)
                 {
                     // ո at the start of a word reads «во»; a plain «о» there is օ (or stays Russian until օ is known).
@@ -120,6 +150,8 @@ namespace Aib.Data
             }
             return sb.ToString();
         }
+
+        static bool IsVowelOrSign(char c) => Vowels.IndexOf(c) >= 0 || c == 'ь' || c == 'ъ';
 
         /// <summary>First letter capital, as at the start of a sentence: ասա → Ասա, ու → Ու, և → Եվ.</summary>
         public static string Capitalize(string word)

@@ -112,6 +112,19 @@ namespace Aib.UI
                 });
                 settings.Add(dayLock);
             }
+            // For testers: open everything at once. Asks once more before doing it.
+            if (app.Course.Lessons.Any(l => app.Progress.Result(l.day) == null))
+            {
+                Button unlock = null;
+                bool asked = false;
+                unlock = Ui.Button("Открыть все уроки", () =>
+                {
+                    if (asked) { app.UnlockAll(); return; }
+                    asked = true;
+                    unlock.text = "Отметить все дни пройденными? Нажмите ещё раз";
+                }, "btn-ghost", "small");
+                settings.Add(unlock);
+            }
             Add(settings);
         }
 

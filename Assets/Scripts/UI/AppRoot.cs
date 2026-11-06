@@ -276,6 +276,15 @@ namespace Aib.UI
             });
         }
 
+        /// <summary>For testers: every day counts as passed, all letters and words are known.</summary>
+        public void UnlockAll()
+        {
+            Progress.UnlockAll(Course.Lessons.Select(l => (l.day,
+                l.newLetters.Select(id => Course.Letter(id).Key).Concat(l.words.Select(w => w.Key)))), DateTime.Now);
+            SaveProgress();
+            ShowHome();
+        }
+
         public void SaveProgress()
         {
             ProgressStore.Save(Progress);

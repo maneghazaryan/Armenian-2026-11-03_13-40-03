@@ -23,6 +23,9 @@ letters a day, and from day 1 you read real words made only of the letters you k
 - **Russian «р».** In mixed texts ր is used only for the soft «р» before и е ё ю я ь («сирена»,
   «пример»). Every hard «р» («рама», «красиво», «размер», «терраса») is ռ and stays Russian until
   ռ is learned. Names written with ր in Armenian («Сахара», unlike «сахар») are listed as exceptions.
+- **Other sounds in mixed texts.** я ё ю are written յա յո յու, and «е» after a vowel յե. A soft «т»
+  is ծ and a soft «д» is ձ («мать» — Մածь, «Дима» — Ձիմա), with no յ after them («тётя» — ծոծա).
+  «ч» is չ, which is exactly the Russian sound.
 - **Each day has three parts**, opened one after another:
   1. *Lesson* — new letter cards (Russian sound, Russian letter name, a «Как запомнить»
      association that builds on letters already learned, e.g. ի is ր with the stem up, ա is

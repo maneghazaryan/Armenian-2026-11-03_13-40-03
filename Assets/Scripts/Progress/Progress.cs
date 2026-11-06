@@ -90,6 +90,21 @@ namespace Aib.Progress
             return true;
         }
 
+        /// <summary>
+        /// For testers: marks every day as done (3 stars, as of yesterday, so nothing waits for tomorrow)
+        /// and starts tracking all its letters and words. Days already done keep their stars.
+        /// </summary>
+        public void UnlockAll(IEnumerable<(int day, IEnumerable<string> keys)> days, DateTime today)
+        {
+            foreach (var (day, keys) in days)
+            {
+                if (Result(day) == null)
+                    results.Add(new DayResult { day = day, stars = 3, date = DayUnlock.Format(today.AddDays(-1)) });
+                partial.RemoveAll(x => x.day == day);
+                Learn(keys, today);
+            }
+        }
+
         /// <summary>Count a wrong answer for each of these letters or words.</summary>
         public void Missed(IEnumerable<string> keys)
         {
