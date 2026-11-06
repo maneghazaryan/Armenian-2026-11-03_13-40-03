@@ -60,7 +60,7 @@ namespace Aib.Tests
                 Assert.IsNotEmpty(list, $"day {lesson.day} part {part}");
                 Assert.AreEqual(part == 1 ? lesson.newLetters.Count : 0, list.Count(e => e.Kind == ExerciseKind.LetterIntro));
                 Assert.AreEqual(hasAudio && part == 2, list.Any(e => e.Kind == ExerciseKind.ListenPickWord));
-                foreach (var ex in list.Where(e => e.IsQuiz))
+                foreach (var ex in list.Where(e => e.IsQuiz && e.Kind != ExerciseKind.DrawLetter))
                 {
                     if (ex.Kind == ExerciseKind.BuildWord)
                     {
@@ -167,6 +167,12 @@ namespace Aib.Tests
             Assert.AreEqual("Երևան!", ArmenianText.MixRussian("Ереван!", course.GlyphsUpTo(7)));
             Assert.AreEqual("окно", ArmenianText.MixRussian("окно", new HashSet<string>()));
             Assert.AreEqual("Օլя", ArmenianText.MixRussian("Оля", course.GlyphsUpTo(17)));
+
+            // ր only for the light «р»; the strong one at the start of a word is ռ, Russian until ռ is known.
+            Assert.AreEqual("Рամա", ArmenianText.MixRussian("Рама", course.GlyphsUpTo(2)));
+            Assert.AreEqual("Ռամա", ArmenianText.MixRussian("Рама", course.GlyphsUpTo(16)));
+            Assert.AreEqual("Ռուսսկիյ միր", ArmenianText.MixRussian("Русский мир", course.GlyphsUpTo(16)));
+            Assert.AreEqual("տեռասա", ArmenianText.MixRussian("терраса", course.GlyphsUpTo(16)));
 
             foreach (var lesson in course.Lessons)
             {
@@ -322,6 +328,113 @@ namespace Aib.Tests
             Assert.IsEmpty(Reminders.Plan(p, morning, doneToday: false));
             Assert.AreEqual(9, Reminders.NextHour(-1));
             Assert.AreEqual(-1, Reminders.NextHour(21));
+        }
+
+        // ---------- drawing letters ----------
+
+        /// <summary>The letter's own mask cells, as if drawn dot by dot, moved and scaled.</summary>
+        static List<List<Vector2>> DrawnFrom(bool[] mask, float scale = 1, Vector2 shift = default)
+        {
+            var strokes = new List<List<Vector2>>();
+            for (int i = 0; i < mask.Length; i++)
+                if (mask[i])
+                {
+                    var p = new Vector2(i % DrawingCheck.N + 0.5f, i / DrawingCheck.N + 0.5f) / DrawingCheck.N;
+                    strokes.Add(new List<Vector2> { (p - new Vector2(.5f, .5f)) * scale + new Vector2(.5f, .5f) + shift });
+                }
+            return strokes;
+        }
+
+        [Test]
+        public void EveryLetterHasAShapeToTraceAndCheck()
+        {
+            foreach (var letter in LoadCourse().Letters)
+            foreach (var glyph in new[] { letter.lower, letter.upper })
+            {
+                var key = GlyphStore.Key(letter, glyph);
+                var mask = GlyphStore.Mask(key);
+                Assert.IsNotNull(mask, key);
+                Assert.Greater(mask.Count(c => c), 20, key);
+                var guide = GlyphStore.Guide(key);
+                Assert.IsNotNull(guide, key);
+                Assert.AreEqual(256, guide.width, key);
+                Assert.IsTrue(DrawingCheck.Passes(DrawnFrom(mask), mask, fromMemory: false), key);
+            }
+        }
+
+        [Test]
+        public void Drawing_FromMemoryMayBeAnywhereButMustBeTheLetter()
+        {
+            var course = LoadCourse();
+            var s = GlyphStore.Mask(GlyphStore.Key(course.Letter("s"), "ս"));
+            var l = GlyphStore.Mask(GlyphStore.Key(course.Letter("l"), "լ"));
+            var small = DrawnFrom(s, 0.5f, new Vector2(-0.2f, 0.15f));
+            Assert.IsFalse(DrawingCheck.Passes(small, s, fromMemory: false), "tracing must follow the sample");
+            Assert.IsTrue(DrawingCheck.Passes(small, s, fromMemory: true));
+            Assert.IsFalse(DrawingCheck.Passes(DrawnFrom(l), s, fromMemory: true), "լ is not ս");
+
+            var scribble = new List<List<Vector2>> { new List<Vector2> { new Vector2(.1f, .1f), new Vector2(.9f, .9f), new Vector2(.1f, .9f), new Vector2(.9f, .1f) } };
+            Assert.IsFalse(DrawingCheck.Passes(scribble, s, fromMemory: true));
+            Assert.IsFalse(DrawingCheck.Passes(new List<List<Vector2>>(), s, fromMemory: true));
+        }
+
+        [Test]
+        public void NewLettersAreTracedThenWrittenFromMemory()
+        {
+            var course = LoadCourse();
+            foreach (var lesson in course.Lessons)
+            {
+                var part1 = ExerciseBuilder.Build(course, lesson, 1, _ => false, 3);
+                var part2 = ExerciseBuilder.Build(course, lesson, 2, _ => false, 3);
+                foreach (var id in lesson.newLetters)
+                {
+                    int intro = part1.FindIndex(e => e.Kind == ExerciseKind.LetterIntro && e.Letter.id == id);
+                    Assert.AreEqual(ExerciseKind.TraceLetter, part1[intro + 1].Kind, $"day {lesson.day} {id}");
+                    Assert.AreEqual(part1[intro].Letter.lower, part1[intro + 1].Shown);
+                    Assert.IsTrue(part2.Any(e => e.Kind == ExerciseKind.DrawLetter && e.Letter.id == id), $"day {lesson.day} {id}");
+                }
+            }
+        }
+
+        // ---------- review and reading ----------
+
+        [Test]
+        public void ReadingTexts_LoadAndTurnArmenianAsLettersAreLearned()
+        {
+            var course = LoadCourse();
+            var texts = ReadingText.ListFromJson(Resources.Load<TextAsset>("Data/reading").text);
+            Assert.GreaterOrEqual(texts.Count, 20);
+            Assert.AreEqual(texts.Count, texts.Select(t => t.id).Distinct().Count());
+            foreach (var t in texts)
+            {
+                Assert.IsFalse(string.IsNullOrWhiteSpace(t.title), t.id);
+                Assert.Greater(t.text.Length, 200, t.id);
+                Assert.AreEqual(t.text, ArmenianText.MixRussian(t.text, new HashSet<string>()), t.id);
+                int day1 = ArmenianText.MixRussian(t.text, course.GlyphsUpTo(1)).Count(ArmenianText.IsArmenian);
+                int all = ArmenianText.MixRussian(t.text, course.GlyphsUpTo(17)).Count(ArmenianText.IsArmenian);
+                Assert.Greater(day1, 0, t.id);
+                Assert.Greater(all, day1 * 2, t.id);
+            }
+        }
+
+        [Test]
+        public void Practice_PicksHardItemsFirst_AndReadTextsAreRemembered()
+        {
+            var p = new ProgressData();
+            var today = new DateTime(2026, 1, 10);
+            p.Learn(new[] { "l:s", "l:a", "l:r", "w:sar" }, today);
+            p.Reviewed("l:s", true, today);
+            p.Missed(new[] { "w:sar" });
+            var keys = p.PracticeKeys(3, new System.Random(1));
+            Assert.AreEqual(3, keys.Count);
+            Assert.AreEqual("w:sar", keys[0]);
+            CollectionAssert.DoesNotContain(keys, "l:s"); // the best remembered one is left out
+
+            Assert.IsFalse(p.IsRead("octopus"));
+            p.MarkRead("octopus");
+            p.MarkRead("octopus");
+            Assert.IsTrue(p.IsRead("octopus"));
+            Assert.AreEqual(1, p.read.Count);
         }
     }
 }

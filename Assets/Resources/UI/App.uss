@@ -17,7 +17,6 @@
 }
 .btn:active { scale: 0.97 0.97; }
 .btn-primary { background-color: #F28C38; color: #FFFFFF; }
-.btn-primary:hover { background-color: #E07B28; }
 .btn-secondary { background-color: #FFE7D1; color: #B5332E; }
 .btn-ghost { background-color: rgba(0,0,0,0); color: #B5332E; }
 .btn-icon { background-color: rgba(0,0,0,0); font-size: 36px; padding: 4px 16px; margin-right: 12px; }
@@ -179,3 +178,47 @@
 /* letters and words with mistakes */
 .letter-cell.hard { background-color: #FFF1C9; }
 .archive-row.hard { border-left-width: 8px; border-color: #F2A900; }
+
+/* ---------- drawing a letter ---------- */
+.draw-stage { justify-content: center; align-items: stretch; }
+.draw-pad {
+    width: 500px; height: 500px; align-self: center; flex-shrink: 0;
+    background-color: #FFFFFF; border-radius: 28px; border-width: 3px; border-color: #F0ECE6;
+    overflow: hidden;
+}
+.draw-guide, .draw-ink {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    -unity-background-image-tint-color: rgba(181, 51, 46, 0.2);
+}
+.draw-sound { font-size: 36px; color: #B5332E; -unity-text-align: middle-center; margin-bottom: 12px; }
+.draw-note { font-size: 24px; color: #8A8794; -unity-text-align: middle-center; white-space: normal; min-height: 36px; margin-top: 8px; }
+.draw-tools { flex-direction: row; justify-content: center; }
+
+/* Mouse hover/press. The built-in theme greys out any hovered button (.unity-button:hover:enabled),
+   so each style restates its own colour with a more specific selector. */
+.btn:hover:enabled, .btn:hover:active:enabled { background-color: #FFF4EA; }
+.btn.btn-primary:hover:enabled, .btn.btn-primary:hover:active:enabled,
+.btn.btn-play:hover:enabled, .btn.btn-play:hover:active:enabled { background-color: #E07B28; }
+.btn.btn-secondary:hover:enabled, .btn.btn-secondary:hover:active:enabled,
+.btn.btn-back:hover:enabled, .btn.btn-back:hover:active:enabled { background-color: #FFDDBE; }
+.btn.btn-ghost:hover:enabled, .btn.btn-ghost:hover:active:enabled,
+.btn.btn-icon:hover:enabled, .btn.btn-icon:hover:active:enabled { background-color: rgba(181, 51, 46, 0.08); }
+.btn.letter-cell:hover:enabled, .btn.letter-cell:hover:active:enabled { background-color: #E8E2DA; }
+.btn.letter-cell.learned:hover:enabled, .btn.letter-cell.learned:hover:active:enabled { background-color: #FFF4EA; }
+.btn.letter-cell.hard:hover:enabled, .btn.letter-cell.hard:hover:active:enabled { background-color: #FFEAB0; }
+.btn.shake:hover:enabled, .btn.shake:hover:active:enabled { background-color: #FBE3E2; }
+
+.landscape .draw-pad { width: 680px; height: 680px; }
+
+/* ---------- reading ---------- */
+.reading-item {
+    -unity-text-align: middle-left; white-space: normal; font-size: 30px;
+    padding: 20px 24px; margin: 6px 0; border-radius: 18px;
+}
+.reading-item.read { color: #8A8794; }
+.reading-page { padding-bottom: 24px; }
+.reading-title { font-size: 46px; -unity-font-style: bold; -unity-text-align: middle-center; white-space: normal; margin: 8px 0; }
+.reading-text { font-size: 36px; white-space: normal; margin: 12px 0; -unity-text-align: upper-left; }
+.landscape .reading-list { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+.landscape .reading-list > .reading-item { width: 49.5%; }
+.landscape .reading-page { max-width: 1100px; align-self: center; }

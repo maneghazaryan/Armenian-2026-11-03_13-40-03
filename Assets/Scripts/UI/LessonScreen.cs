@@ -29,6 +29,8 @@ namespace Aib.UI
         readonly LessonSession _session;
         readonly VisualElement _progressFill;
         readonly ScrollView _body;
+        /// <summary>Holds the drawing exercises outside the scroll view, so a finger stroke draws instead of scrolling.</summary>
+        readonly VisualElement _stage;
         readonly VisualElement _footer;
         readonly Button _back;
         bool _hadMistake;
@@ -57,6 +59,8 @@ namespace Aib.UI
             _body.contentViewport.RegisterCallback<GeometryChangedEvent>(e =>
                 _body.contentContainer.style.minHeight = e.newRect.height);
             Add(_body);
+            _stage = Ui.Box("draw-stage", "grow");
+            Add(_stage);
             _footer = Ui.Box("lesson-footer");
             Add(_footer);
 
@@ -104,6 +108,8 @@ namespace Aib.UI
             switch (ex.Kind)
             {
                 case ExerciseKind.LetterIntro: ShowLetterIntro(ex); break;
+                case ExerciseKind.TraceLetter:
+                case ExerciseKind.DrawLetter: ShowDraw(ex); break;
                 case ExerciseKind.WordIntro: ShowWordIntro(ex); break;
                 case ExerciseKind.PickLetter: ShowPickLetter(ex); break;
                 case ExerciseKind.MatchCase: ShowMatchCase(ex); break;
@@ -130,6 +136,87 @@ namespace Aib.UI
             _body.Add(LetterCard.Build(_app, ex.Letter));
             if (ex.UseAudio) _app.Audio.Play(ex.Letter.AudioId);
             SetFooter(null, "Дальше", Next);
+        }
+
+        /// <summary>
+        /// Trace the letter over a faint sample, or write it from memory. A wrong drawing from memory
+        /// counts as a mistake, then the sample appears and the letter is traced instead.
+        /// </summary>
+        void ShowDraw(Exercise ex)
+        {
+            bool tracing = ex.Kind == ExerciseKind.TraceLetter;
+            var key = GlyphStore.Key(ex.Letter, ex.Shown);
+            var mask = GlyphStore.Mask(key);
+            bool capital = ex.Shown == ex.Letter.upper && ex.Shown != ex.Letter.lower;
+            var form = capital ? "большую (заглавную)" : "маленькую (строчную)";
+            int failedTraces = 0;
+
+            _body.style.display = DisplayStyle.None;
+            _stage.style.display = DisplayStyle.Flex;
+            var prompt = Ui.Label(tracing ? $"Обведите {form} букву {ex.Shown}" : $"Напишите по памяти {form} букву", "prompt");
+            _stage.Add(prompt);
+            if (!tracing) _stage.Add(Ui.Label($"звук [{ex.Letter.ru}] · буква «{ex.Letter.nameRu}»", "draw-sound"));
+            var pad = new DrawPad(GlyphStore.Guide(key)) { GuideVisible = tracing };
+            _stage.Add(pad);
+            var note = Ui.Label("", "draw-note");
+            _stage.Add(note);
+            var tools = Ui.Box("draw-tools");
+            tools.Add(Ui.Button("Стереть", pad.Erase, "btn-ghost", "small"));
+            Button forgot = null;
+            if (!tracing)
+            {
+                forgot = Ui.Button("Не помню — показать", () =>
+                {
+                    _hadMistake = true;
+                    ToTracing("Вот она. Обведите её по образцу.");
+                }, "btn-ghost", "small");
+                tools.Add(forgot);
+            }
+            _stage.Add(tools);
+            SetFooter(null, "Проверить", Check);
+
+            void ToTracing(string message)
+            {
+                tracing = true;
+                pad.Erase();
+                pad.GuideVisible = true;
+                forgot?.RemoveFromHierarchy();
+                prompt.text = Ui.Mark($"Обведите букву {ex.Shown} по образцу");
+                note.text = message;
+            }
+
+            void Check()
+            {
+                if (pad.IsEmpty)
+                {
+                    note.text = tracing ? "Ведите пальцем или мышью по светлой букве." : "Напишите букву пальцем или мышью.";
+                    return;
+                }
+                if (mask == null || DrawingCheck.Passes(pad.Strokes, mask, fromMemory: !tracing))
+                {
+                    pad.GuideVisible = true;
+                    pad.pickingMode = PickingMode.Ignore;
+                    tools.visible = false;
+                    note.text = "";
+                    if (ex.UseAudio) _app.Audio.Play(ex.Letter.AudioId);
+                    ShowFeedback($"{ex.Letter.upper} {ex.Letter.lower} — звук [{ex.Letter.ru}]");
+                    return;
+                }
+                if (ex.Kind == ExerciseKind.DrawLetter && !_hadMistake)
+                {
+                    _hadMistake = true;
+                    ToTracing("Не совсем так. Посмотрите на образец и обведите букву.");
+                    return;
+                }
+                failedTraces++;
+                pad.Erase();
+                note.text = "Ещё раз: ведите линию прямо по светлой букве.";
+                if (failedTraces >= 2)
+                {
+                    SetFooter(null, "Проверить", Check);
+                    _footer.Add(Ui.Button("Пропустить", Next, "btn-ghost", "small"));
+                }
+            }
         }
 
         void ShowWordIntro(Exercise ex)
@@ -351,6 +438,9 @@ namespace Aib.UI
         {
             _body.Clear();
             _body.scrollOffset = UnityEngine.Vector2.zero;
+            _body.style.display = DisplayStyle.Flex;
+            _stage.Clear();
+            _stage.style.display = DisplayStyle.None;
         }
 
         static string Capitalize(string word, string glyph) =>

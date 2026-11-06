@@ -8,6 +8,8 @@ namespace Aib.Lesson
     public enum ExerciseKind
     {
         LetterIntro,         // card: new letter, its sound, association, optional deep explanation
+        TraceLetter,         // trace the letter over a faint sample (practice, never a mistake)
+        DrawLetter,          // write the letter from memory; the sample appears only after
         WordIntro,           // card: new word with meaning, before any quiz about it
         PickLetter,          // "which letter sounds like «с»?" (or by audio)
         MatchCase,           // capital -> small letter, or small -> capital
@@ -25,14 +27,14 @@ namespace Aib.Lesson
         public LetterData Letter;
         public WordData Word;
         public bool UseAudio;
-        /// <summary>What is shown: MatchCase — the given glyph; ReadPickTranslation — the word, maybe
+        /// <summary>What is shown: MatchCase — the given glyph; TraceLetter/DrawLetter — the glyph to write; ReadPickTranslation — the word, maybe
         /// capitalised; MixedText — the mixed text (Answer holds the plain Russian).</summary>
         public string Shown;
         /// <summary>Answer choices (PickLetter: lowercase glyphs; others: text) or BuildWord tiles.</summary>
         public List<string> Options = new List<string>();
         public string Answer;
 
-        public bool IsQuiz => Kind != ExerciseKind.LetterIntro && Kind != ExerciseKind.WordIntro &&
+        public bool IsQuiz => Kind != ExerciseKind.LetterIntro && Kind != ExerciseKind.TraceLetter && Kind != ExerciseKind.WordIntro &&
                               Kind != ExerciseKind.Phrase && Kind != ExerciseKind.MixedText;
 
         /// <summary>Progress key of the letter or word this exercise trains (null for texts).</summary>
@@ -66,10 +68,16 @@ namespace Aib.Lesson
             switch (part)
             {
                 case 1:
-                    // Meet each new letter, then recognise it by sound and as capital/small.
-                    // Two older letters get their capitals refreshed too.
+                    // Meet each new letter and trace it, small then capital; then recognise it by sound
+                    // and as capital/small. Two older letters get their capitals refreshed too.
                     foreach (var id in lesson.newLetters)
-                        result.Add(new Exercise { Kind = ExerciseKind.LetterIntro, Letter = course.Letter(id), UseAudio = hasAudio("l_" + id) });
+                    {
+                        var letter = course.Letter(id);
+                        result.Add(new Exercise { Kind = ExerciseKind.LetterIntro, Letter = letter, UseAudio = hasAudio("l_" + id) });
+                        result.Add(Draw(ExerciseKind.TraceLetter, letter, letter.lower));
+                        if (HasOwnCapital(letter))
+                            result.Add(Draw(ExerciseKind.TraceLetter, letter, letter.upper));
+                    }
                     var letterQuizzes = new List<Exercise>();
                     foreach (var id in lesson.newLetters)
                     {
@@ -105,7 +113,10 @@ namespace Aib.Lesson
                             more.Add(ListenPick(word, knownWords, rng));
                     }
                     foreach (var id in lesson.newLetters)
+                    {
                         more.Add(MatchCase(course.Letter(id), known, rng));
+                        more.Add(Draw(ExerciseKind.DrawLetter, course.Letter(id), course.Letter(id).lower));
+                    }
                     result.AddRange(Spread(more, rng));
                     break;
 
@@ -133,7 +144,12 @@ namespace Aib.Lesson
                 switch (course.ByKey(key))
                 {
                     case LetterData letter:
-                        result.Add(rng.Next(2) == 0 ? PickLetter(letter, known, hasAudio, rng) : MatchCase(letter, known, rng));
+                        switch (rng.Next(3))
+                        {
+                            case 0: result.Add(PickLetter(letter, known, hasAudio, rng)); break;
+                            case 1: result.Add(MatchCase(letter, known, rng)); break;
+                            default: result.Add(Draw(ExerciseKind.DrawLetter, letter, letter.lower)); break;
+                        }
                         break;
                     case WordData word:
                         int kinds = hasAudio(word.AudioId) ? 4 : 3;
@@ -188,6 +204,13 @@ namespace Aib.Lesson
             }
             return best;
         }
+
+        /// <summary>Trace or write one form of a letter.</summary>
+        static Exercise Draw(ExerciseKind kind, LetterData letter, string glyph) =>
+            new Exercise { Kind = kind, Letter = letter, Shown = glyph, Answer = glyph };
+
+        /// <summary>և has no capital of its own: at the start of a word it is written Եվ, two known letters.</summary>
+        static bool HasOwnCapital(LetterData letter) => letter.id != "ev";
 
         static Exercise PickLetter(LetterData letter, List<LetterData> known, Func<string, bool> hasAudio, Random rng)
         {

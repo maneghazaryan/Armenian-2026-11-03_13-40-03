@@ -13,14 +13,25 @@ letters a day, and from day 1 you read real words made only of the letters you k
   գ զ · շ ժ · հ յ · խ ղ · թ ք փ · ծ ց · ճ չ ջ · ռ ձ ը · օ ֆ.
 - **Spaced review (Leitner boxes).** Every learned letter and word comes back after 1, 3, 7,
   14 and 30 days; a mistake sends it back to "tomorrow". At most 12 items per day.
+  «Повторение» is always on the home screen once something is learned: today's due items, or,
+  when nothing is due, a free practice of hard and least remembered items (correct answers
+  don't move review dates; a mistake marks the item hard and brings it back tomorrow).
+- **Reading (Чтение).** 26 interesting facts (Armenia, animals, space, nature and people),
+  checked against sources, in Russian with every sound the learner already knows written in
+  Armenian letters. The more letters learned, the more Armenian the text shows; «Показать
+  по-русски» switches to plain Russian. Texts live in `Assets/Resources/Data/reading.json`.
+- **Russian «р».** In mixed texts ր is used only for the light tap («сирена», «мир»). The strong
+  «р» at the start of a word («рама») and «рр» are ռ, and stay Russian until ռ is learned.
 - **Each day has three parts**, opened one after another:
   1. *Lesson* — new letter cards (Russian sound, Russian letter name, a «Как запомнить»
      association that builds on letters already learned, e.g. ի is ր with the stem up, ա is
-     ս plus a stick and a tail; an optional «Подробнее» explanation) → find the letter →
+     ս plus a stick and a tail; an optional «Подробнее» explanation) → **trace the letter**,
+     small then capital, over a faint sample → find the letter →
      match capital ↔ small → **each new word is shown with its meaning first** → read a word
      and pick its meaning → build it from letter tiles.
   2. *Practice* — the same words from other angles: meaning → Armenian word, reading,
-     spelling, listening (only when audio exists), capitals.
+     spelling, listening (only when audio exists), capitals, and **each new letter written
+     from memory**.
   3. *Reading* — familiar Russian sentences in which the known sounds are written in Armenian
      letters («Սиրենա зաпелա…»), then short Armenian phrases.
 
@@ -28,6 +39,13 @@ letters a day, and from day 1 you read real words made only of the letters you k
   answered wrongly comes back at the end of the part. After the first meeting, the meaning
   and pronunciation of an Armenian word are hidden behind «Подсказка» / a tap. «‹» goes back
   one step; the Android back button and Escape work too.
+- **Writing letters.** The pad accepts a finger or the mouse. A drawing is compared with a
+  64×64 mask of the letter: most of the ink must lie near the letter and most of the letter
+  must be drawn over. Tracing compares in place. From memory the drawing may be anywhere and
+  any size; it is fitted onto the letter first, and only near-twins (գ/զ, ծ/ճ) can be mistaken
+  for each other. A wrong drawing from memory (or «Не помню») counts as a mistake, then the
+  sample appears to trace. Tracing is practice and never counts as a mistake. Letters in
+  review are also sometimes written from memory.
 - **Armenian vs Russian at a glance:** Armenian text is red; in mixed text Armenian letters
   are red and bold, Russian ones plain.
 - **Explanations never mention letters the learner hasn't met yet** — checked by
@@ -50,6 +68,7 @@ letters a day, and from day 1 you read real words made only of the letters you k
 | `Assets/Resources/UI/App.uss` | all styles |
 | `Assets/Scripts/` | `Data/` course model, `Lesson/` exercise builder and session, `Progress/` unlocking and saving, `UI/` screens |
 | `Tools/validate_course.py` | checks that every word uses only letters learned by that day |
+| `Tools/gen_glyphs.py` | renders the letter samples and masks for the drawing exercises into `Assets/Resources/Glyphs/` (needs Pillow; rerun after changing the font or `letters.json`) |
 | `Tools/gen_audio.py` | generates missing audio clips |
 
 The app builds its UI at startup (`AppRoot`), so the scene needs no setup.

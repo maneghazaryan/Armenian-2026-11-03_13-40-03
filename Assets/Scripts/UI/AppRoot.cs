@@ -21,6 +21,8 @@ namespace Aib.UI
         public Course Course { get; private set; }
         public ProgressData Progress { get; private set; }
         public AudioService Audio { get; private set; }
+        /// <summary>Interesting facts for the reading section.</summary>
+        public List<ReadingText> Reading { get; private set; }
 
         /// <summary>Layout is designed for 1280 units of height and 720 of width (portrait).</summary>
         static readonly Vector2Int Reference = new Vector2Int(720, 1280);
@@ -46,6 +48,7 @@ namespace Aib.UI
             Course = Course.FromJson(
                 Resources.Load<TextAsset>("Data/letters").text,
                 Resources.Load<TextAsset>("Data/lessons").text);
+            Reading = ReadingText.ListFromJson(Resources.Load<TextAsset>("Data/reading").text);
             Progress = ProgressStore.Load();
             Progress.Prune(key => Course.ByKey(key) != null);
             Audio = gameObject.AddComponent<AudioService>();
@@ -134,6 +137,21 @@ namespace Aib.UI
 
         public void ShowArchive() => Show(new ArchiveScreen(this));
 
+        public void ShowReading() => Show(new ReadingScreen(this));
+
+        public void ShowReadingText(ReadingText text) => Show(new ReadingScreen(this, text));
+
+        /// <summary>Letters met so far: those of finished days and of a day whose first part is done.</summary>
+        public HashSet<string> KnownGlyphs()
+        {
+            int day = Course.Lessons
+                .Where(l => Progress.PartsDone(l.day, ExerciseBuilder.Parts) > 0)
+                .Select(l => l.day)
+                .DefaultIfEmpty(0)
+                .Max();
+            return Course.GlyphsUpTo(day);
+        }
+
         /// <summary>
         /// One part of a day: 1 — new letters and words, 2 — more practice, 3 — reading.
         /// Without a part, continues where the learner stopped (part 1 when replaying a finished day).
@@ -182,9 +200,17 @@ namespace Aib.UI
             }));
         }
 
-        /// <summary>Today's spaced review: only items that are due, at most Leitner.MaxPerSession.</summary>
+        /// <summary>
+        /// Review from the home screen. When items are due, today's spaced review (at most
+        /// Leitner.MaxPerSession). Otherwise free practice: hard and least remembered items first.
+        /// </summary>
         public void ShowReview()
         {
+            if (Progress.Due(DateTime.Now).Count == 0)
+            {
+                ShowPractice();
+                return;
+            }
             var keys = Progress.Due(DateTime.Now).Take(Leitner.MaxPerSession).Select(i => i.key).ToList();
             Show(new LessonScreen(this, new LessonPlan
             {
@@ -204,6 +230,36 @@ namespace Aib.UI
                     {
                         $"Вспомнили сразу: {remembered} из {keys.Count}.",
                         session.Missed.Count > 0 ? "Ошибки повторим снова завтра." : "Отлично! Следующее повторение — через несколько дней.",
+                    };
+                },
+            }));
+        }
+
+        /// <summary>
+        /// Extra practice when nothing is due. Correct answers don't move review dates (the item is not
+        /// due yet); a mistake marks the item hard and brings it back tomorrow.
+        /// </summary>
+        void ShowPractice()
+        {
+            var keys = Progress.PracticeKeys(Leitner.MaxPerSession, new System.Random(Environment.TickCount));
+            Show(new LessonScreen(this, new LessonPlan
+            {
+                Heading = "Повторение",
+                Title = "Тренировка",
+                Intro = "На сегодня всё повторено. Потренируемся ещё: сначала трудные буквы и слова, потом те, что вы знаете хуже всего.",
+                Exercises = ExerciseBuilder.BuildReview(Course, keys, Progress.LastCompletedDay, Audio.Has, Environment.TickCount),
+                Finish = session =>
+                {
+                    var now = DateTime.Now;
+                    foreach (var key in session.Missed)
+                        Progress.Reviewed(key, false, now);
+                    Progress.Missed(session.Missed);
+                    SaveProgress();
+                    int remembered = keys.Count(k => !session.Missed.Contains(k));
+                    return new[]
+                    {
+                        $"Вспомнили сразу: {remembered} из {keys.Count}.",
+                        session.Missed.Count > 0 ? "Ошибки повторим завтра." : "Отлично, всё помните!",
                     };
                 },
             }));

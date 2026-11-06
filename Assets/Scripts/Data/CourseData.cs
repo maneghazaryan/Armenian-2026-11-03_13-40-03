@@ -56,6 +56,23 @@ namespace Aib.Data
         public List<string> texts = new List<string>();
     }
 
+    /// <summary>A longer Russian text (an interesting fact) read with the learned sounds in Armenian letters.</summary>
+    [Serializable]
+    public class ReadingText
+    {
+        public string id;
+        public string topic;
+        public string emoji;
+        public string title;
+        public string text;
+
+        public static List<ReadingText> ListFromJson(string json) =>
+            UnityEngine.JsonUtility.FromJson<ReadingList>(json).texts;
+    }
+
+    [Serializable]
+    class ReadingList { public List<ReadingText> texts; }
+
     [Serializable]
     class LetterList { public List<LetterData> letters; }
 

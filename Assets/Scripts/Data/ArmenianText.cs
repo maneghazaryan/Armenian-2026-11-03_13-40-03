@@ -36,7 +36,7 @@ namespace Aib.Data
         {
             ['а'] = "ա", ['б'] = "բ", ['в'] = "վ", ['г'] = "գ", ['д'] = "դ", ['е'] = "ե", ['ж'] = "ժ",
             ['з'] = "զ", ['и'] = "ի", ['й'] = "յ", ['к'] = "կ", ['л'] = "լ", ['м'] = "մ", ['н'] = "ն",
-            ['о'] = "ո", ['п'] = "պ", ['р'] = "ր", ['с'] = "ս", ['т'] = "տ", ['у'] = "ու", ['ф'] = "ֆ",
+            ['о'] = "ո", ['п'] = "պ", ['с'] = "ս", ['т'] = "տ", ['у'] = "ու", ['ф'] = "ֆ",
             ['х'] = "խ", ['ц'] = "ծ", ['ч'] = "ճ", ['ш'] = "շ", ['э'] = "է",
         };
 
@@ -44,6 +44,8 @@ namespace Aib.Data
         /// Writes the sounds of a Russian text that the learner can already read with Armenian letters:
         /// «Сирена запела» with ս ա ր known → «Սиրенա запелա». ո follows its reading rule
         /// («во» at the start of a word, «о» inside), and «ев» inside a word becomes և.
+        /// Russian «р» is ր only where it is a light tap («сирена», «мир»); the strong «р» at the start
+        /// of a word («рама») and a double «рр» are ռ, and stay Russian until ռ is learned.
         /// </summary>
         public static string MixRussian(string text, ISet<string> known)
         {
@@ -66,6 +68,16 @@ namespace Aib.Data
                 {
                     hy = "և";
                     used = 2;
+                }
+                else if (lower == 'р')
+                {
+                    bool doubled = i + 1 < text.Length && char.ToLowerInvariant(text[i + 1]) == 'р';
+                    string letter = wordStart || doubled ? "ռ" : "ր";
+                    if (known.Contains(letter))
+                    {
+                        hy = letter;
+                        used = doubled ? 2 : 1;
+                    }
                 }
                 else if (lower == 'о' && wordStart)
                 {

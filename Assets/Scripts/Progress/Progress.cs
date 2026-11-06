@@ -48,7 +48,9 @@ namespace Aib.Progress
         public List<ItemState> items = new List<ItemState>();
         public List<PartProgress> partial = new List<PartProgress>();
         public List<MissCount> misses = new List<MissCount>();
-        /// <summary>When true, the next lesson opens only on the next calendar day. Off only in debug builds.</summary>
+        /// <summary>Ids of reading texts read to the end.</summary>
+        public List<string> read = new List<string>();
+        /// <summary>When true, the next lesson opens only on the next calendar day; the learner can switch it off.</summary>
         public bool dayLock = true;
         /// <summary>Hour of the daily reminder, or -1 when reminders are off.</summary>
         public int reminderHour = 19;
@@ -108,6 +110,25 @@ namespace Aib.Progress
         {
             items.RemoveAll(i => !exists(i.key));
             misses.RemoveAll(m => !exists(m.key));
+        }
+
+        /// <summary>
+        /// Items for practice when nothing is due: hard ones first, then the least remembered (lowest box),
+        /// in random order within each group.
+        /// </summary>
+        public List<string> PracticeKeys(int count, System.Random rng) => items
+            .OrderByDescending(i => IsHard(i.key))
+            .ThenBy(i => i.box)
+            .ThenBy(_ => rng.Next())
+            .Take(count)
+            .Select(i => i.key)
+            .ToList();
+
+        public bool IsRead(string id) => read.Contains(id);
+
+        public void MarkRead(string id)
+        {
+            if (!read.Contains(id)) read.Add(id);
         }
 
         /// <summary>Items whose review date has come, most overdue first.</summary>

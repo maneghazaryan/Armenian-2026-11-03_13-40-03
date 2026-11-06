@@ -28,15 +28,18 @@ namespace Aib.UI
             var list = Ui.Box("day-list"); // two columns in landscape
             scroll.Add(list);
 
+            // Review is always open once something is learned: today's due items, or free practice.
             int due = app.Progress.Due(today).Count;
-            if (due > 0)
+            if (app.Progress.items.Count > 0)
             {
                 var review = Ui.Box("day-card", "review-card");
                 var text = Ui.Box("grow");
-                text.Add(Ui.Label("Повторение на сегодня", "day-title"));
-                text.Add(Ui.Label($"Букв и слов: {Math.Min(due, Leitner.MaxPerSession)}", "muted"));
+                text.Add(Ui.Label(due > 0 ? "Повторение на сегодня" : "Повторение", "day-title"));
+                text.Add(Ui.Label(due > 0
+                    ? $"Букв и слов: {Math.Min(due, Leitner.MaxPerSession)}"
+                    : "На сегодня всё повторено — можно потренироваться ещё.", "muted", "wrap"));
                 review.Add(text);
-                review.Add(Ui.Button("Повторить", app.ShowReview, "btn-primary"));
+                review.Add(Ui.Button(due > 0 ? "Повторить" : "Тренировка", app.ShowReview, due > 0 ? "btn-primary" : "btn-secondary"));
                 list.Add(review);
             }
 
@@ -85,6 +88,7 @@ namespace Aib.UI
             var footer = Ui.Box("footer");
             footer.Add(Ui.Button("Алфавит", app.ShowAlphabet, "btn-secondary", "grow"));
             footer.Add(Ui.Button("Словарь", app.ShowArchive, "btn-secondary", "grow", "gap-left"));
+            footer.Add(Ui.Button("Чтение", app.ShowReading, "btn-secondary", "grow", "gap-left"));
             Add(footer);
 
             var settings = Ui.Box("footer");
