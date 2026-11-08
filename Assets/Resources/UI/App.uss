@@ -39,6 +39,10 @@
 .day-done { border-color: #5BAE6A; }
 .day-available { border-color: #F28C38; }
 .day-locked, .day-lockeduntiltomorrow { opacity: 0.55; }
+.recall-offer { justify-content: center; align-items: center; padding: 0 40px; }
+.optional-tag { font-size: 20px; color: #5B8FC7; margin-top: 2px; }
+.day-skipped { opacity: 0.55; border-color: #C9C5CF; }
+.skip { align-self: flex-start; margin: 6px 0 0 0; padding: 4px 0; font-size: 22px; color: #8A8794; }
 .day-title { font-size: 28px; -unity-font-style: bold; white-space: normal; }
 .day-letters { font-size: 34px; color: #B5332E; margin-top: 4px; }
 .lock { color: #8A8794; font-size: 30px; }
@@ -65,6 +69,17 @@
 .glyph-xl { font-size: 180px; color: #B5332E; -unity-text-align: middle-center; }
 .glyph-md { font-size: 80px; color: #B5332E; -unity-text-align: middle-center; }
 .letter-name { font-size: 32px; -unity-font-style: bold; margin: 8px 0; }
+.letter-top { flex-direction: row; align-items: center; justify-content: center; }
+.letter-pic { font-size: 120px; margin-left: 28px; -unity-text-align: middle-center; }
+.letter-pic-md { font-size: 64px; margin-left: 20px; -unity-text-align: middle-center; }
+.intro-letters { flex-direction: row; flex-wrap: wrap; justify-content: center; margin: 12px 0; }
+.intro-letter {
+    align-items: center; background-color: #FFFFFF; border-radius: 22px;
+    padding: 12px 20px; margin: 8px; min-width: 150px;
+}
+.intro-glyph { font-size: 72px; color: #B5332E; -unity-text-align: middle-center; }
+.intro-sound { font-size: 28px; -unity-font-style: bold; -unity-text-align: middle-center; }
+.intro-pic { font-size: 44px; -unity-text-align: middle-center; margin-top: 4px; }
 .warn {
     background-color: #FFF1C9; color: #7A5A00; border-radius: 14px; padding: 12px 16px;
     margin: 10px 0; white-space: normal; font-size: 24px;
@@ -102,6 +117,16 @@
 .tiles { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 .tile { width: 110px; height: 110px; margin: 8px; font-size: 60px; -unity-font-style: normal; border-width: 3px; border-color: #F0ECE6; }
 .tile:disabled { opacity: 0.25; }
+.tile-word { width: auto; min-width: 110px; height: 96px; padding: 0 22px; font-size: 44px; }
+.sentence-built {
+    font-size: 52px; color: #B5332E; -unity-text-align: middle-center; min-height: 80px;
+    margin: 20px 0; border-bottom-width: 5px; border-color: #F28C38; padding-bottom: 8px;
+}
+.explain-card {
+    background-color: #FFFFFF; border-radius: 28px; padding: 26px 28px; margin: 12px 0;
+    border-left-width: 8px; border-color: #5B8FC7;
+}
+.explain-text { font-size: 30px; color: #2B2A33; margin: 8px 0; }
 .shake { translate: 10px 0; background-color: #FBE3E2; border-color: #D9534F; }
 
 /* Fixed-height bars must not be squeezed by the growing scroll area. */
@@ -230,6 +255,8 @@
 .hy-item { flex-direction: column; align-items: stretch; }
 .hy-item-title { font-size: 32px; -unity-font-style: bold; color: #B5332E; white-space: normal; }
 .hy-item.read .hy-item-title { color: #8A8794; }
+.hy-item.famous { border-color: #D9A520; border-width: 3px; background-color: #FFF8E6; }
+.hy-famous { font-size: 24px; color: #A87400; -unity-font-style: bold; white-space: normal; }
 .hy-legend { font-size: 24px; color: #8A8794; -unity-text-align: middle-center; margin: 8px 0 12px 0; }
 .hy-block { margin: 10px 0 18px 0; }
 .hy-line { flex-direction: row; flex-wrap: wrap; }

@@ -76,9 +76,13 @@ namespace Aib.UI
         public static VisualElement Build(AppRoot app, LetterData letter, bool compact = false, bool expanded = false)
         {
             var card = Ui.Box("letter-card");
-            card.Add(Ui.Label(letter.upper + " " + letter.lower, compact ? "glyph-md" : "glyph-xl"));
-            card.Add(Ui.Label("большая · маленькая", "muted", "center"));
-            card.Add(Ui.Label($"Звук [{letter.ru}] · буква «{letter.nameRu}»", "letter-name"));
+            // Like a primer page: the letter, a picture, and a keyword starting with its sound.
+            var top = Ui.Box("letter-top");
+            top.Add(Ui.Label(letter.upper + " " + letter.lower, compact ? "glyph-md" : "glyph-xl"));
+            if (!string.IsNullOrEmpty(letter.pic)) top.Add(Ui.Label(letter.pic, compact ? "letter-pic-md" : "letter-pic"));
+            card.Add(top);
+            card.Add(Ui.Label(KeyLine(letter), "letter-name"));
+            card.Add(Ui.Label($"буква «{letter.nameRu}» · большая и маленькая", "muted", "center"));
             card.Add(Ui.Label(letter.hint, "body", "center"));
             if (!string.IsNullOrEmpty(letter.look))
                 card.Add(Ui.Label("Как запомнить: " + letter.look, "look"));
@@ -109,6 +113,14 @@ namespace Aib.UI
             if (app.Audio.Has(letter.AudioId))
                 card.Add(Ui.Button("🔊 Послушать", () => app.Audio.Play(letter.AudioId), "btn-secondary"));
             return card;
+        }
+
+        /// <summary>«[а]  арка» with the sound part of the keyword in red, or just the sound.</summary>
+        public static string KeyLine(LetterData letter)
+        {
+            if (string.IsNullOrEmpty(letter.key)) return $"Звук [{letter.ru}]";
+            var key = letter.key.Replace("{", $"<b><color={Ui.ArmenianColor}>").Replace("}", "</color></b>");
+            return $"[{letter.ru}]  {key}";
         }
     }
 }

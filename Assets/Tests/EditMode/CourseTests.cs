@@ -4,6 +4,7 @@ using System.Linq;
 using Aib.Data;
 using Aib.Lesson;
 using Aib.Progress;
+using Aib.UI;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -70,7 +71,9 @@ namespace Aib.Tests
                 Assert.AreEqual(hasAudio && part == 2, list.Any(e => e.Kind == ExerciseKind.ListenPickWord));
                 foreach (var ex in list.Where(e => e.IsQuiz && e.Kind != ExerciseKind.DrawLetter))
                 {
-                    if (ex.Kind == ExerciseKind.BuildWord)
+                    if (ex.Kind == ExerciseKind.BuildSentence)
+                        CollectionAssert.AreEquivalent(ExerciseBuilder.SentenceWords(ex.Word.hy), ex.Options);
+                    else if (ex.Kind == ExerciseKind.BuildWord)
                     {
                         var tiles = new List<string>(ex.Options);
                         foreach (var t in ArmenianText.Tokenize(ex.Word.hy))
@@ -158,6 +161,8 @@ namespace Aib.Tests
                 for (int i = 1; i < list.Count; i++)
                 {
                     if (!list[i].IsQuiz || !list[i - 1].IsQuiz) continue;
+                    // Sentence drills (fill the gap, build a sentence) come one after another on purpose.
+                    if (list[i].ItemKey == null || list[i - 1].ItemKey == null) continue;
                     Assert.AreNotEqual(list[i - 1].ItemKey, list[i].ItemKey, $"day {lesson.day} part {part} #{i}");
                     if (list[i - 1].Kind == list[i].Kind) sameKind++;
                 }
@@ -318,7 +323,7 @@ namespace Aib.Tests
             Assert.AreEqual(0, p.Due(day).Count);
             Assert.AreEqual(2, p.Due(day.AddDays(1)).Count);
 
-            p.Reviewed("l:a", true, day.AddDays(1));   // box 2 -> next in 3 days
+            p.Reviewed("l:a", true, day.AddDays(1));   // box 2 -> next in 2 days
             p.Reviewed("w:sar", false, day.AddDays(1)); // box 1 -> tomorrow
             Assert.AreEqual(new[] { "w:sar" }, p.Due(day.AddDays(2)).Select(i => i.key).ToArray());
             Assert.AreEqual(2, p.Due(day.AddDays(4)).Count);
@@ -479,27 +484,238 @@ namespace Aib.Tests
         }
 
         [Test]
-        public void WordDays_FollowTheAlphabet_AndTeachOnlyWords()
+        public void WordDays_FollowTheAlphabet_AsSmallTopics_MostNeededFirst()
         {
             var course = LoadCourse();
             Assert.AreEqual(17, course.AlphabetDays);
-            var wordDays = course.Lessons.Where(l => l.IsWordsDay).ToList();
-            Assert.GreaterOrEqual(wordDays.Count, 10);
-            Assert.IsTrue(wordDays.All(l => l.day > course.AlphabetDays && l.words.Count >= 5));
+            var topics = course.Topics.ToList();
+            Assert.GreaterOrEqual(topics.Count, 60);
+            // Very small portions: at most 3 new words; a grammar topic may have none, only sentences.
+            Assert.IsTrue(topics.All(l => l.IsWordsDay && l.words.Count <= 3), "topics are small");
+            Assert.IsTrue(topics.All(l => l.words.Count > 0 || l.gaps.Count > 0), "every topic teaches something");
             CollectionAssert.AreEqual(Enumerable.Range(1, course.Lessons.Count), course.Lessons.Select(l => l.day));
+            // Everyday words come first and are obligatory; animals are optional and come at the end.
+            Assert.AreEqual("Да и нет", topics[0].title);
+            Assert.IsTrue(topics.Take(12).All(l => !l.optional), "the first topics are obligatory");
+            Assert.Greater(topics.Count(l => l.optional), 10);
+            Assert.Greater(topics.Count(l => !l.optional), 30);
+            var optionalWords = topics.Where(l => l.optional).SelectMany(l => l.words).Select(w => w.hy).ToList();
+            CollectionAssert.IsSubsetOf(new[] { "փիսիկ", "փիսո", "մուկ", "հավ", "խոզ", "տավար", "ձի", "թռչուն" }, optionalWords);
+            var obligatoryWords = topics.Where(l => !l.optional).SelectMany(l => l.words).Select(w => w.hy).ToList();
+            CollectionAssert.IsSubsetOf(new[] { "հա", "չէ", "այո", "ձեզ", "ոնց", "մենք", "դուք", "քո", "կներեք", "մերսի", "ուր", "քարտով", "տոպրակ", "ջան" }, obligatoryWords);
 
             var all = course.Lessons.SelectMany(l => l.words).ToList();
             Assert.AreEqual(all.Count, all.Select(w => w.hy).Distinct().Count(), "a word is taught twice");
             Assert.AreEqual(all.Count, all.Select(w => w.id).Distinct().Count());
+            var hy = all.Select(w => w.hy).ToHashSet();
+            foreach (var w in new[] { "քույր", "եղբայր", "ախպեր", "ծնող", "ընտանիք", "երեխա", "տղա", "աղջիկ", "կին", "տղամարդ", "մարդ",
+                         "ջան", "սեր", "ընկեր", "տուն", "շենք", "թեյ", "մեծ", "փոքր", "բարձր", "ցածր", "շատ", "քիչ", "օր", "տարի",
+                         "լավ", "վատ", "հիվանդ", "առողջ", "հա", "չէ", "այո", "ոչ", "կներեք", "ներողություն", "ուր", "որտեղ",
+                         "ես", "դու", "մենք", "դուք", "իմ", "քո", "կատու", "ձուկ", "մեջք", "ոտք", "ձեռք", "քարտով", "տոպրակ", "հաջողություն",
+                         "արագ", "դանդաղ" })
+                Assert.IsTrue(hy.Contains(w), w);
+            foreach (var w in new[] { "մահճակալ", "լամպ", "ավտոբուս", "կամուրջ", "վերնաշապիկ", "տաբատ", "վերարկու", "դուստր", "որդի" })
+                Assert.IsFalse(hy.Contains(w), w);
 
-            foreach (var lesson in wordDays)
+            foreach (var lesson in topics)
             {
+                var words = lesson.words.Concat(course.ReviewWords(lesson)).ToList();
+                Assert.AreEqual(lesson.review.Count, course.ReviewWords(lesson).Count, $"{lesson.title}: unknown review id");
                 var part1 = ExerciseBuilder.Build(course, lesson, 1, _ => false, 1);
-                Assert.IsFalse(part1.Any(e => e.Letter != null), $"day {lesson.day}");
-                Assert.AreEqual(lesson.words.Count, part1.Count(e => e.Kind == ExerciseKind.WordIntro));
+                Assert.IsFalse(part1.Any(e => e.Letter != null), lesson.title);
+                Assert.AreEqual(lesson.explain.Count, part1.Count(e => e.Kind == ExerciseKind.Explain));
+                CollectionAssert.AreEqual(words, part1.Where(e => e.Kind == ExerciseKind.WordIntro).Select(e => e.Word));
+                Assert.AreEqual(lesson.review.Count, part1.Count(e => e.Kind == ExerciseKind.WordIntro && e.Review));
                 var part3 = ExerciseBuilder.Build(course, lesson, 3, _ => false, 1);
                 Assert.AreEqual(lesson.phrases.Count, part3.Count(e => e.Kind == ExerciseKind.Phrase));
-                CollectionAssert.AreEquivalent(lesson.words, part3.Where(e => e.Kind == ExerciseKind.MeaningPickWord).Select(e => e.Word));
+                CollectionAssert.AreEquivalent(words, part3.Where(e => e.Kind == ExerciseKind.MeaningPickWord).Select(e => e.Word));
+            }
+        }
+
+        [Test]
+        public void Grammar_FillTheGapAndBuildSentences()
+        {
+            var course = LoadCourse();
+            var be = course.Topics.First(l => l.gaps.Any(g => g.hy == "Մենք լավ [ենք]։"));
+            Assert.IsTrue(course.Topics.First(l => l.gaps.Count > 0).explain.Any(t => t.Contains("օժանդակ բայ")));
+            var gaps = ExerciseBuilder.Build(course, be, 1, _ => false, 3).Where(e => e.Kind == ExerciseKind.FillGap).ToList();
+            Assert.AreEqual(be.gaps.Count, gaps.Count);
+            var we = gaps.First(e => e.Word.hy == "Մենք լավ [ենք]։");
+            Assert.AreEqual("Մենք լավ …։", we.Shown);
+            Assert.Contains("ենք", we.Options);
+            Assert.AreEqual(4, we.Options.Count);
+            Assert.AreEqual("Մենք լավ ենք։", ExerciseBuilder.GapFull(we.Word.hy));
+
+            var sentences = course.Topics.First(l => l.order.Count > 0);
+            var built = ExerciseBuilder.Build(course, sentences, 2, _ => false, 5).Where(e => e.Kind == ExerciseKind.BuildSentence).ToList();
+            Assert.AreEqual(sentences.order.Count, built.Count);
+            foreach (var e in built)
+            {
+                var words = ExerciseBuilder.SentenceWords(e.Word.hy);
+                CollectionAssert.AreEquivalent(words, e.Options);
+                CollectionAssert.AreNotEqual(words, e.Options, "words come shuffled");
+                Assert.IsNull(e.ItemKey);
+            }
+            Assert.IsTrue(gaps.All(e => e.ItemKey == null), "sentences are not review items");
+            CollectionAssert.AreEqual(new[] { "Դու", "հայ", "ե՞ս" }, ExerciseBuilder.SentenceWords("Դու հայ ե՞ս։"));
+        }
+
+        [Test]
+        public void Topics_TwoOpenAtOnce_OnlyOptionalOnesCanBeSkipped()
+        {
+            var course = LoadCourse();
+            var today = new DateTime(2026, 11, 7);
+            var p = new ProgressData { dayLock = false };
+            var topics = course.Topics.ToList();
+            var days = topics.Select(l => l.day).ToList();
+            Assert.AreEqual(DayState.Locked, DayUnlock.State(course, days[0], p, today), "alphabet first");
+
+            for (int d = 1; d <= course.AlphabetDays; d++) p.Complete(d, 3, today.AddDays(-1));
+            CollectionAssert.AreEqual(days.Take(2), DayUnlock.OpenTopicDays(course, p));
+            Assert.AreEqual(DayState.Available, DayUnlock.State(course, days[0], p, today));
+            Assert.AreEqual(DayState.Available, DayUnlock.State(course, days[1], p, today));
+            Assert.AreEqual(DayState.Locked, DayUnlock.State(course, days[2], p, today));
+
+            // Do the second one: the third opens, the first stays open.
+            p.Complete(days[1], 3, today);
+            CollectionAssert.AreEqual(new[] { days[0], days[2] }, DayUnlock.OpenTopicDays(course, p));
+
+            // An obligatory topic can't be skipped: it stays open.
+            Assert.IsFalse(topics[0].optional);
+            p.Skip(days[0]);
+            Assert.AreEqual(DayState.Available, DayUnlock.State(course, days[0], p, today));
+            p.Unskip(days[0]);
+
+            // An optional one can: the next topic opens instead, and it can come back.
+            int opt = topics.FindIndex(l => l.optional);
+            for (int i = 0; i < opt; i++) p.Complete(days[i], 3, today.AddDays(-1));
+            CollectionAssert.AreEqual(new[] { days[opt], days[opt + 1] }, DayUnlock.OpenTopicDays(course, p));
+            p.Skip(days[opt]);
+            Assert.AreEqual(DayState.Skipped, DayUnlock.State(course, days[opt], p, today));
+            CollectionAssert.AreEqual(new[] { days[opt + 1], days[opt + 2] }, DayUnlock.OpenTopicDays(course, p));
+
+            // A started topic stays open even when an earlier one comes back.
+            p.CompletePart(days[opt + 2], 1, ExerciseBuilder.Parts, 0, today);
+            p.Unskip(days[opt]);
+            CollectionAssert.AreEquivalent(new[] { days[opt], days[opt + 2] }, DayUnlock.OpenTopicDays(course, p));
+
+            // One lesson a day: nothing opens on the day a topic was done.
+            p.Complete(days[opt + 1], 3, today);
+            p.dayLock = true;
+            Assert.AreEqual(DayState.LockedUntilTomorrow, DayUnlock.State(course, days[opt], p, today));
+            Assert.AreEqual(DayState.Available, DayUnlock.State(course, days[opt], p, today.AddDays(1)));
+        }
+
+        [Test]
+        public void Recall_AtAppStart_OncePerDay_MostlyMistakesAndWeakWords()
+        {
+            var today = new DateTime(2026, 11, 7);
+            var p = new ProgressData();
+            Assert.IsFalse(p.ShouldOfferRecall(today), "nothing learned yet");
+            var weak = new[] { "w:a1", "w:a2", "w:a3" };
+            var strong = Enumerable.Range(0, 30).Select(i => "w:s" + i).ToArray();
+            p.Learn(weak.Concat(strong).Concat(new[] { "w:due" }), today.AddDays(-40));
+            foreach (var k in strong)
+                for (int i = 0; i < Leitner.MaxBox; i++) p.Reviewed(k, true, today.AddDays(-20));
+            foreach (var k in weak) p.Reviewed(k, false, today.AddDays(-20));
+            p.Missed(weak);
+            foreach (var i in p.items.Where(i => i.key != "w:due")) i.due = DayUnlock.Format(today.AddDays(5));
+            p.items.First(i => i.key == "w:due").due = DayUnlock.Format(today);
+            Assert.IsTrue(p.ShouldOfferRecall(today));
+
+            // Due items first; among the rest, hard ones are much likelier than well-known ones.
+            int weakPicked = 0;
+            for (int seed = 0; seed < 200; seed++)
+            {
+                var keys = p.RecallKeys(4, new System.Random(seed), today);
+                Assert.AreEqual(4, keys.Count);
+                Assert.AreEqual("w:due", keys[0]);
+                Assert.AreEqual(4, keys.Distinct().Count());
+                weakPicked += keys.Count(weak.Contains);
+            }
+            // 3 hard words among 33: by chance about 0.3 per draw; weighted, far more.
+            Assert.Greater(weakPicked / 200.0, 1.0);
+
+            p.lastRecall = DayUnlock.Format(today);
+            Assert.IsFalse(p.ShouldOfferRecall(today), "once a day");
+            Assert.IsTrue(p.ShouldOfferRecall(today.AddDays(1)));
+
+            // New words come back after 1, 2, 4, 7, 14 and 30 days.
+            var q = new ProgressData();
+            q.Learn(new[] { "w:sar" }, today);
+            var gaps = new List<int>();
+            var at = today.AddDays(1);
+            for (int i = 0; i < 6; i++)
+            {
+                q.Reviewed("w:sar", true, at);
+                var due = DayUnlock.Parse(q.items[0].due);
+                gaps.Add((due - at).Days);
+                at = due;
+            }
+            CollectionAssert.AreEqual(new[] { 2, 4, 7, 14, 30, 30 }, gaps);
+        }
+
+        [Test]
+        public void Topics_TeachEndings_AndBuildTheirPhrasesFromWords()
+        {
+            var course = LoadCourse();
+            var topics = course.Topics.ToList();
+            var utyun = topics.First(l => l.title.Contains("ություն"));
+            Assert.IsTrue(utyun.gaps.All(g => ExerciseBuilder.GapAnswer(g.hy) == "ություն"));
+            var gaps = ExerciseBuilder.Gaps(utyun, new System.Random(1));
+            Assert.IsTrue(gaps.All(e => e.Options.Count == 4 && e.Options.Contains("ություն")), "other endings as wrong choices");
+            foreach (var ending in new[] { "ներ", "ում", "ից" })
+                Assert.IsTrue(topics.Any(l => l.gaps.Any(g => ExerciseBuilder.GapAnswer(g.hy) == ending)), ending);
+            // Each ending topic comes after the words it uses.
+            int i = topics.IndexOf(utyun);
+            Assert.Less(topics.FindIndex(l => l.words.Any(w => w.hy == "հաջողություն")), i);
+
+            // Part 3 builds the topic's phrases from their words.
+            foreach (var lesson in topics)
+            {
+                var part3 = ExerciseBuilder.Build(course, lesson, 3, _ => false, 2);
+                CollectionAssert.AreEquivalent(lesson.phrases.Where(ExerciseBuilder.CanBuild),
+                    part3.Where(e => e.Kind == ExerciseKind.BuildSentence).Select(e => e.Word), lesson.title);
+            }
+            Assert.Greater(topics.Sum(l => l.phrases.Count(ExerciseBuilder.CanBuild)), 60);
+        }
+
+        [Test]
+        public void RemovedWords_LeaveReviewAndLessons_AndCanComeBack()
+        {
+            var course = LoadCourse();
+            var today = new DateTime(2026, 11, 7);
+            var p = new ProgressData();
+            p.Learn(new[] { "w:sar", "w:masis" }, today);
+            p.Missed(new[] { "w:masis" });
+            p.RemoveWord("w:masis");
+            Assert.IsFalse(p.IsLearning("w:masis"));
+            Assert.IsFalse(p.IsHard("w:masis"));
+            p.Learn(new[] { "w:masis" }, today); // completing the day again doesn't bring it back
+            Assert.IsFalse(p.IsLearning("w:masis"));
+            Assert.AreEqual(new[] { "w:sar" }, p.Due(today.AddDays(1)).Select(i => i.key).ToArray());
+
+            var day2 = course.Lesson(2).Keeping(k => !p.IsRemoved(k));
+            Assert.IsFalse(day2.words.Any(w => w.id == "masis"));
+            Assert.IsTrue(course.Lesson(2).words.Any(w => w.id == "masis"), "the course itself is untouched");
+            Assert.IsFalse(ExerciseBuilder.Build(course, day2, 1, _ => false, 1).Any(e => e.Word?.id == "masis"));
+
+            p.RestoreWord("w:masis");
+            p.Learn(new[] { "w:masis" }, today);
+            Assert.IsTrue(p.IsLearning("w:masis"));
+
+            // Removing a word in the middle of a lesson drops its remaining exercises.
+            var lesson = course.Lesson(1);
+            var session = new LessonSession(ExerciseBuilder.Build(course, lesson, 1, _ => false, 2));
+            var sar = lesson.words.First(w => w.id == "sar");
+            while (session.Current.Word != sar) session.Complete(false);
+            session.Drop(sar);
+            int left = session.Total - session.Index;
+            Assert.Greater(left, 0);
+            while (!session.IsFinished)
+            {
+                Assert.AreNotEqual(sar, session.Current.Word);
+                session.Complete(false);
             }
         }
 
@@ -552,10 +768,40 @@ namespace Aib.Tests
             var none = new HashSet<string>();
             var some = course.Lessons.SelectMany(l => l.words).Select(w => w.hy.ToLowerInvariant()).ToHashSet();
             Assert.Less(Unknown(some), Unknown(none));
-            // Original tales have far more new words than the retold ones.
+            // Long tales have more new words than the short stories for beginners.
             var texts = LoadHyTexts();
             int Count(string id) => course.Dictionary.WordsOf(texts.First(t => t.id == id).text, id).Count;
-            Assert.Greater(Count("anxelq"), Count("anxelq_easy") * 2);
+            Assert.Greater(Count("aregnazan"), Count("family") * 2);
+        }
+
+        [Test]
+        public void ArmenianTexts_AreRetoldTalesAndPoems_WithTheBestLovedMarked()
+        {
+            var texts = LoadHyTexts();
+            var famous = texts.Where(t => t.famous).Select(t => t.id).ToList();
+            foreach (var id in new[] { "anahit", "aregnazan", "shun_katu", "kikos_easy", "nazar", "poch_aghves" })
+                CollectionAssert.Contains(famous, id);
+            Assert.Less(famous.Count, texts.Count);
+            Assert.AreEqual("⭐ Любимая сказка армян", HyReadingScreen.FamousNote(texts.First(t => t.id == "anahit")));
+            // Tales are close to the originals: Tumanyan's whole, Aghayan's long ones shortened.
+            int Words(string id) => texts.First(t => t.id == id).text.Split(' ', '\n').Length;
+            Assert.Greater(Words("nazar"), 2000);
+            Assert.That(Words("anahit"), Is.InRange(2000, 4500));
+            Assert.That(Words("aregnazan"), Is.InRange(2000, 4500));
+            StringAssert.Contains("Փուշիկ տվի, լոշիկ առա,\nԼոշիկ տվի, գառնիկ առա,", texts.First(t => t.id == "tsit_easy").text);
+        }
+
+        [Test]
+        public void Dictionary_RecognisesInflectedFormsOfListedWords()
+        {
+            var dict = ArmenianDictionary.Parse("սպանել = убить\nվագր = тигр\nբարկանալ = сердиться\nտեսնել = видеть\n");
+            Assert.AreEqual("սպանել", dict.Find("կսպանի", null).Entry.hy);
+            Assert.AreEqual("սպանել", dict.Find("սպանեցին", null).Entry.hy);
+            Assert.AreEqual("վագր", dict.Find("վագրին,", null).Entry.hy);
+            Assert.AreEqual("բարկանալ", dict.Find("բարկացավ", null).Entry.hy);
+            Assert.AreEqual("տեսնել", dict.Find("չտեսնում", null).Entry.hy);
+            Assert.IsNull(dict.Find("քաղաք", null));
+            Assert.IsNull(dict.Find("վագրին", null).Note);
         }
 
         [Test]
@@ -594,8 +840,10 @@ namespace Aib.Tests
             p.CompletePart(2, 1, ExerciseBuilder.Parts, 1, today);
             p.Missed(new[] { "l:s" });
             p.MarkRead("hy:family");
+            p.Skip(20);
+            p.RemoveWord("w:sar");
             p.Reset();
-            Assert.AreEqual(0, p.results.Count + p.items.Count + p.partial.Count + p.misses.Count + p.read.Count);
+            Assert.AreEqual(0, p.results.Count + p.items.Count + p.partial.Count + p.misses.Count + p.read.Count + p.skipped.Count + p.removed.Count);
             Assert.IsFalse(p.dayLock);
             Assert.AreEqual(8, p.reminderHour);
             Assert.AreEqual(DayState.Available, DayUnlock.State(1, p, today));

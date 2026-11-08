@@ -46,28 +46,34 @@ namespace Aib.UI
 
             foreach (var lesson in app.Course.Lessons)
             {
-                // After the alphabet: a new set of words every day.
+                bool topic = app.Course.IsTopic(lesson.day);
+                // After the alphabet: small topics of words, two open at a time.
                 if (lesson.day == app.Course.AlphabetDays + 1)
                 {
                     list.Add(Ui.Label("Слова на каждый день", "section-title", "full-row"));
-                    list.Add(Ui.Label("Алфавит выучен — дальше каждый день новые слова и их повторение.", "muted", "full-row"));
+                    list.Add(Ui.Label($"Маленькие темы по 1–3 слова. Открыты {DayUnlock.OpenTopics} — выбирайте любую. " +
+                        "Темы «по желанию» можно пропустить, а слово, которое не хочется учить, — убрать.", "muted", "full-row", "wrap"));
                 }
-                var state = DayUnlock.State(lesson.day, app.Progress, today);
+                var state = app.StateOf(lesson.day, today);
                 var card = Ui.Box("day-card", "day-" + state.ToString().ToLowerInvariant());
 
                 var letters = lesson.IsWordsDay
-                    ? string.Join(", ", lesson.words.Take(3).Select(w => w.hy)) + "…"
+                    ? string.Join(", ", lesson.words.Take(4).Select(w => w.hy)) + (lesson.words.Count > 4 ? "…" : "")
                     : string.Join("  ", lesson.newLetters.Select(id =>
                     {
                         var l = app.Course.Letter(id);
                         return l.upper + " " + l.lower;
                     }));
                 var text = Ui.Box("grow");
-                text.Add(Ui.Label($"День {lesson.day} · {lesson.title}", "day-title"));
-                text.Add(Ui.Label(letters, "day-letters"));
+                text.Add(Ui.Label(topic ? lesson.title : $"День {lesson.day} · {lesson.title}", "day-title"));
+                if (lesson.optional) text.Add(Ui.Label("по желанию", "optional-tag"));
+                text.Add(Ui.Label(letters, "day-letters", "wrap"));
                 int parts = app.Progress.PartsDone(lesson.day, ExerciseBuilder.Parts);
                 if (state == DayState.Available || state == DayState.ReviewFirst)
                     text.Add(Ui.Label(PartDots(parts), "parts"));
+                // An optional topic not done yet can be skipped; a skipped one can be brought back.
+                if (lesson.optional && state != DayState.Done && state != DayState.Skipped)
+                    text.Add(Ui.Button("Пропустить тему", () => app.SkipTopic(lesson.day), "btn-ghost", "small", "skip"));
                 card.Add(text);
 
                 switch (state)
@@ -84,6 +90,9 @@ namespace Aib.UI
                         break;
                     case DayState.LockedUntilTomorrow:
                         card.Add(Ui.Label("Завтра", "lock"));
+                        break;
+                    case DayState.Skipped:
+                        card.Add(Ui.Button("Вернуть", () => app.UnskipTopic(lesson.day), "btn-secondary"));
                         break;
                     default:
                         card.Add(Ui.Label("🔒", "lock"));
@@ -122,7 +131,8 @@ namespace Aib.UI
                 settings.Add(dayLock);
             }
             // Start over. Asks once more before doing it.
-            if (app.Progress.results.Count > 0 || app.Progress.items.Count > 0 || app.Progress.partial.Count > 0)
+            if (app.Progress.results.Count > 0 || app.Progress.items.Count > 0 || app.Progress.partial.Count > 0 ||
+                app.Progress.skipped.Count > 0 || app.Progress.removed.Count > 0)
             {
                 Button reset = null;
                 bool asked = false;
@@ -130,7 +140,7 @@ namespace Aib.UI
                 {
                     if (asked) { app.ResetProgress(); return; }
                     asked = true;
-                    reset.text = "Начать заново? Всё пройденное забудется. Нажмите ещё раз";
+                    reset.text = "Начать заново? Всё пройденное, пропущенные темы и убранные слова забудутся. Нажмите ещё раз";
                 }, "btn-ghost", "small");
                 settings.Add(reset);
             }
@@ -156,6 +166,38 @@ namespace Aib.UI
         {
             var dots = string.Join(" ", Enumerable.Range(0, ExerciseBuilder.Parts).Select(i => i < done ? "●" : "○"));
             return done == 0 ? $"{dots}  урок, практика, чтение" : $"{dots}  часть {done + 1} из {ExerciseBuilder.Parts}";
+        }
+    }
+
+    /// <summary>
+    /// Shown once a day when the app opens: a short recall of what is known already. It can be skipped.
+    /// </summary>
+    public class RecallOfferScreen : VisualElement, IBackHandler
+    {
+        readonly AppRoot _app;
+
+        public RecallOfferScreen(AppRoot app)
+        {
+            _app = app;
+            AddToClassList("screen");
+            var body = Ui.Box("grow", "recall-offer");
+            body.Add(Ui.Label("Այբ", "logo"));
+            body.Add(Ui.Label("С возвращением!", "title", "center"));
+            body.Add(Ui.Label($"Вспомним немного из того, что вы уже знаете? {AppRoot.RecallItems} слов и одна фраза — пара минут.",
+                "body", "center", "wrap"));
+            Add(body);
+            var footer = Ui.Box("lesson-footer");
+            footer.Add(Ui.Button("Вспомнить", app.ShowRecall, "btn-primary", "wide"));
+            footer.Add(Ui.Button("Пропустить", Skip, "btn-ghost", "small"));
+            Add(footer);
+        }
+
+        public void OnBack() => Skip();
+
+        void Skip()
+        {
+            _app.RecallOffered();
+            _app.ShowHome();
         }
     }
 }

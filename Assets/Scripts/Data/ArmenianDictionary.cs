@@ -105,8 +105,63 @@ namespace Aib.Data
         {
             var key = Normalize(word);
             if (key.Length == 0) return null;
+            var exact = FindExact(key, textId);
+            if (exact != null) return exact;
+            // Not listed: an inflected form of a listed word (Ձիավորին → ձիավոր, կսպանի → սպանել).
+            foreach (var guess in Guesses(key))
+            {
+                var g = FindExact(guess, textId);
+                if (g != null) return new DictForm { Entry = g.Entry, Note = null };
+            }
+            return null;
+        }
+
+        DictForm FindExact(string key, string textId)
+        {
             if (textId != null && _forms.TryGetValue(textId, out var own) && own.TryGetValue(key, out var f)) return f;
             return _forms.TryGetValue(Common, out var common) && common.TryGetValue(key, out f) ? f : null;
+        }
+
+        static readonly string[] NounEndings =
+        {
+            "ներից", "երից", "ներին", "երին", "ներով", "երով", "ներում", "երում", "ներին", "ները", "երը", "ների", "երի",
+            "ներն", "երն", "ներս", "երս", "ներդ", "երդ", "ներ", "եր", "ումս", "ումդ", "ից", "ով", "ում", "ին", "իս", "իդ",
+            "ն", "ը", "ի", "ս", "դ", "ու",
+        };
+
+        /// <summary>Verb endings and the infinitive endings they may come from.</summary>
+        static readonly (string end, string[] inf)[] VerbEndings =
+        {
+            ("ացրեցին", new[] { "ացնել" }), ("ացրեց", new[] { "ացնել" }), ("ացրել", new[] { "ացնել" }), ("ացրին", new[] { "ացնել" }),
+            ("եցինք", new[] { "ել", "նել" }), ("եցին", new[] { "ել", "նել" }), ("եցիք", new[] { "ել" }), ("եցեք", new[] { "ել" }),
+            ("եցիր", new[] { "ել" }), ("եցի", new[] { "ել", "նել" }), ("եցավ", new[] { "ենալ", "անալ" }), ("եցան", new[] { "ենալ", "անալ" }),
+            ("եցել", new[] { "ենալ", "անալ" }), ("եցած", new[] { "ենալ", "անալ", "ել" }), ("եց", new[] { "ել", "նել" }),
+            ("ացավ", new[] { "անալ", "ենալ" }), ("ացան", new[] { "անալ", "ենալ" }), ("ացար", new[] { "անալ" }), ("ացա", new[] { "անալ" }),
+            ("ացել", new[] { "անալ", "ալ" }), ("ացած", new[] { "անալ", "ալ" }), ("ացին", new[] { "ալ", "անալ" }), ("ացի", new[] { "ալ" }), ("աց", new[] { "ալ", "անալ" }),
+            ("ելու", new[] { "ել" }), ("ելիս", new[] { "ել" }), ("ելով", new[] { "ել" }), ("ելուց", new[] { "ել" }), ("ելը", new[] { "ել" }),
+            ("ալու", new[] { "ալ" }), ("ալիս", new[] { "ալ" }), ("ալով", new[] { "ալ" }), ("ալուց", new[] { "ալ" }),
+            ("ում", new[] { "ել", "ալ", "նել" }), ("ված", new[] { "վել" }), ("ած", new[] { "ել", "ալ", "նել" }), ("ող", new[] { "ել", "ալ" }),
+            ("ավ", new[] { "նել", "ալ", "ել" }), ("ան", new[] { "նել", "ալ" }), ("ար", new[] { "նել", "ալ" }), ("ա", new[] { "նել", "ալ" }),
+            ("ենք", new[] { "ել", "նել" }), ("եք", new[] { "ել", "նել" }), ("են", new[] { "ել", "նել" }), ("եմ", new[] { "ել", "նել" }), ("ես", new[] { "ել", "նել" }),
+            ("իր", new[] { "ել", "նել" }), ("ի", new[] { "ել", "նել" }), ("ել", new[] { "ել" }), ("ալ", new[] { "ալ" }),
+        };
+
+        /// <summary>Possible dictionary words for a form not listed itself: endings and the կ-/չ- prefixes taken off.</summary>
+        public static IEnumerable<string> Guesses(string key)
+        {
+            foreach (var prefix in new[] { "", "կ", "չ" })
+            {
+                if (!key.StartsWith(prefix) || key.Length - prefix.Length < 2) continue;
+                var rest = key.Substring(prefix.Length);
+                if (prefix.Length > 0) yield return rest;
+                foreach (var end in NounEndings)
+                    if (rest.Length - end.Length >= 2 && rest.EndsWith(end))
+                        yield return rest.Substring(0, rest.Length - end.Length);
+                foreach (var (end, infs) in VerbEndings)
+                    if (rest.Length - end.Length >= 2 && rest.EndsWith(end))
+                        foreach (var inf in infs)
+                            yield return rest.Substring(0, rest.Length - end.Length) + inf;
+            }
         }
 
         /// <summary>

@@ -13,6 +13,8 @@ namespace Aib.UI
         public string Heading;
         public string Title;
         public string Intro;
+        /// <summary>Letters introduced on this page, shown big on the first page.</summary>
+        public List<LetterData> Letters;
         public List<Exercise> Exercises;
         /// <summary>Saves the outcome and returns summary lines for the result screen.</summary>
         public Func<LessonSession, IEnumerable<string>> Finish;
@@ -86,6 +88,20 @@ namespace Aib.UI
             ClearBody();
             _body.Add(Ui.Label(_plan.Heading, "muted", "center"));
             _body.Add(Ui.Label(_plan.Title, "title", "center"));
+            if (_plan.Letters != null && _plan.Letters.Count > 0)
+            {
+                // The day's new letters at a glance: glyph, sound and picture.
+                var row = Ui.Box("intro-letters");
+                foreach (var letter in _plan.Letters)
+                {
+                    var tile = Ui.Box("intro-letter");
+                    tile.Add(Ui.Label(letter.upper + letter.lower, "intro-glyph"));
+                    tile.Add(Ui.Label($"[{letter.ru}]", "intro-sound"));
+                    if (!string.IsNullOrEmpty(letter.pic)) tile.Add(Ui.Label(letter.pic, "intro-pic"));
+                    row.Add(tile);
+                }
+                _body.Add(row);
+            }
             _body.Add(Ui.Label(_plan.Intro, "body", "center"));
             SetFooter(null, "Поехали!", ShowCurrent);
         }
@@ -119,6 +135,9 @@ namespace Aib.UI
                 case ExerciseKind.ListenPickWord: ShowListenPick(ex); break;
                 case ExerciseKind.BuildWord: ShowBuildWord(ex); break;
                 case ExerciseKind.Phrase: ShowPhrase(ex); break;
+                case ExerciseKind.Explain: ShowExplain(ex); break;
+                case ExerciseKind.FillGap: ShowFillGap(ex); break;
+                case ExerciseKind.BuildSentence: ShowBuildSentence(ex); break;
             }
         }
 
@@ -221,7 +240,7 @@ namespace Aib.UI
 
         void ShowWordIntro(Exercise ex)
         {
-            _body.Add(Ui.Label("Новое слово", "muted", "center"));
+            _body.Add(Ui.Label(ex.Review ? "Вы уже знаете это слово" : "Новое слово", "muted", "center"));
             var card = Ui.Box("letter-card");
             card.Add(Ui.Label(ex.Word.emoji ?? "", "emoji-big"));
             card.Add(Ui.Label(ex.Word.hy, "word-big"));
@@ -234,8 +253,68 @@ namespace Aib.UI
                 card.Add(PlayButton(ex.Word.AudioId, autoplay: true));
             }
             _body.Add(card);
-            _body.Add(Ui.Label("Прочитайте слово вслух по буквам, потом целиком.", "muted", "center"));
+            _body.Add(Ui.Label(ex.Review ? "Вспомните, как оно читается, и прочитайте вслух." : "Прочитайте слово вслух по буквам, потом целиком.", "muted", "center"));
             SetFooter(null, "Дальше", Next);
+            // Not every word is worth learning for everyone: this one leaves lessons and review.
+            _footer.Add(Ui.Button("Не учить это слово", () =>
+            {
+                _app.RemoveWord(ex.Word.Key);
+                _session.Drop(ex.Word);
+                ShowCurrent();
+            }, "btn-ghost", "small"));
+        }
+
+        void ShowExplain(Exercise ex)
+        {
+            _body.Add(Ui.Label("Как это устроено", "muted", "center"));
+            var card = Ui.Box("explain-card");
+            foreach (var para in ex.Shown.Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries))
+                card.Add(Ui.Label(para, "explain-text", "wrap"));
+            _body.Add(card);
+            SetFooter(null, "Понятно", Next);
+        }
+
+        void ShowFillGap(Exercise ex)
+        {
+            _body.Add(Ui.Label("Какое слово пропущено?", "prompt"));
+            _body.Add(Ui.Label(ex.Shown, "word-big", "wrap"));
+            if (!string.IsNullOrEmpty(ex.Word.ru)) _body.Add(Ui.Label(ex.Word.ru, "body", "center"));
+            AddOptions(ex, "option-word", o => o, extra: ExerciseBuilder.GapFull(ex.Word.hy));
+        }
+
+        /// <summary>Tap the words in order; a wrong word shakes.</summary>
+        void ShowBuildSentence(Exercise ex)
+        {
+            _body.Add(Ui.Label("Соберите предложение", "prompt"));
+            _body.Add(Ui.Label(ex.Word.ru, "title", "center", "wrap"));
+            var target = ExerciseBuilder.SentenceWords(ex.Word.hy);
+            var built = Ui.Label("…", "sentence-built", "wrap");
+            _body.Add(built);
+            var tiles = Ui.Box("tiles");
+            var done = new List<string>();
+            foreach (var w in ex.Options)
+            {
+                Button tile = null;
+                tile = Ui.Button(w, () =>
+                {
+                    if (done.Count >= target.Count) return;
+                    if (w == target[done.Count])
+                    {
+                        done.Add(w);
+                        tile.SetEnabled(false);
+                        built.text = Ui.Mark(string.Join(" ", done));
+                        built.AddToClassList("hy");
+                        if (done.Count == target.Count) ShowFeedback(ex.Word.hy + "\n" + ex.Word.tr);
+                    }
+                    else
+                    {
+                        _hadMistake = true;
+                        Shake(tile);
+                    }
+                }, "tile", "tile-word");
+                tiles.Add(tile);
+            }
+            _body.Add(tiles);
         }
 
         void ShowPickLetter(Exercise ex)

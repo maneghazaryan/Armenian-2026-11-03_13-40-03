@@ -76,7 +76,63 @@ namespace Aib.UI
             ApplyLayout(new Vector2Int(Screen.width, Screen.height), Screen.safeArea);
 
             Reminders.Schedule(Progress, DoneToday());
-            ShowHome();
+            if (Progress.ShouldOfferRecall(DateTime.Now)) Show(new RecallOfferScreen(this));
+            else ShowHome();
+        }
+
+        /// <summary>Words, letters and phrases in the recall offered at app start.</summary>
+        public const int RecallItems = 6;
+        public const int RecallSentences = 1;
+
+        /// <summary>The offer was answered (taken or skipped): not again today.</summary>
+        public void RecallOffered()
+        {
+            Progress.lastRecall = DayUnlock.Format(DateTime.Now);
+            SaveProgress();
+        }
+
+        /// <summary>
+        /// Short recall of what is known already: due items, then a random choice weighted to mistakes
+        /// and weakly known items, and a phrase of a finished day to build from its words. Due items move
+        /// in the review; a mistake on any item brings it back tomorrow.
+        /// </summary>
+        public void ShowRecall()
+        {
+            RecallOffered();
+            var now = DateTime.Now;
+            var rng = new System.Random(Environment.TickCount);
+            var keys = Progress.RecallKeys(RecallItems, rng, now);
+            var due = Progress.Due(now).Select(i => i.key).ToHashSet();
+            var phrases = Course.Lessons
+                .Where(l => l.IsWordsDay && Progress.Result(l.day) != null)
+                .SelectMany(l => l.phrases)
+                .Where(ExerciseBuilder.CanBuild)
+                .OrderBy(_ => rng.Next())
+                .Take(RecallSentences)
+                .Select(p => ExerciseBuilder.BuildSentence(p, rng));
+            var exercises = ExerciseBuilder.BuildReview(Course, keys, Progress.LastCompletedDay, Audio.Has, rng.Next());
+            exercises.AddRange(phrases);
+            Show(new LessonScreen(this, new LessonPlan
+            {
+                Heading = "Вспомним",
+                Title = "Что вы уже знаете",
+                Intro = "Несколько слов, которые вы уже учили, и одна фраза из них. Чаще всего — те, в которых были ошибки.",
+                Exercises = exercises,
+                Finish = session =>
+                {
+                    foreach (var key in keys)
+                        if (due.Contains(key) || session.Missed.Contains(key))
+                            Progress.Reviewed(key, !session.Missed.Contains(key), now);
+                    Progress.Missed(session.Missed);
+                    SaveProgress();
+                    int remembered = keys.Count(k => !session.Missed.Contains(k));
+                    return new[]
+                    {
+                        $"Вспомнили сразу: {remembered} из {keys.Count}.",
+                        session.Missed.Count > 0 ? "Ошибки повторим завтра." : "Отлично, всё помните!",
+                    };
+                },
+            }));
         }
 
         /// <summary>Noto Sans (Latin + Cyrillic) with Armenian, symbol and emoji fallbacks.</summary>
@@ -187,7 +243,9 @@ namespace Aib.UI
         /// </summary>
         public void ShowLesson(int day, int part = 0)
         {
-            var lesson = Course.Lesson(day);
+            // Words the learner chose not to learn are left out.
+            var lesson = Course.Lesson(day).Keeping(key => !Progress.IsRemoved(key));
+            bool topic = Course.IsTopic(day);
             const int parts = ExerciseBuilder.Parts;
             if (part == 0)
                 part = Progress.Result(day) != null ? 1 : Progress.PartsDone(day, parts) + 1;
@@ -203,9 +261,10 @@ namespace Aib.UI
 
             Show(new LessonScreen(this, new LessonPlan
             {
-                Heading = $"День {day} · часть {part} из {parts}",
+                Heading = topic ? $"Тема «{lesson.title}» · часть {part} из {parts}" : $"День {day} · часть {part} из {parts}",
                 Title = title,
                 Intro = intro,
+                Letters = part == 1 ? lesson.newLetters.Select(Course.Letter).ToList() : null,
                 Exercises = ExerciseBuilder.Build(Course, lesson, part, Audio.Has, Environment.TickCount),
                 NextLabel = part < parts ? $"Часть {part + 1} ›" : null,
                 Next = part < parts ? () => ShowLesson(day, part + 1) : null,
@@ -216,16 +275,18 @@ namespace Aib.UI
                     bool dayDone = Progress.CompletePart(day, part, parts, session.Mistakes, now);
                     if (dayDone)
                         Progress.Learn(lesson.newLetters.Select(id => Course.Letter(id).Key)
-                            .Concat(lesson.words.Select(w => w.Key)), now);
+                            .Concat(lesson.words.Select(w => w.Key))
+                            .Concat(Course.ReviewWords(lesson).Select(w => w.Key)), now);
                     SaveProgress();
                     if (!dayDone)
                         return new[] { part < parts ? $"Часть {part} из {parts} пройдена." : "Повторили ещё раз." };
                     return new[]
                     {
-                        $"День {day} пройден!",
+                        topic ? $"Тема «{lesson.title}» пройдена!" : $"День {day} пройден!",
                         lesson.IsWordsDay ? null : "Новые буквы: " + string.Join("  ", lesson.newLetters.Select(id => Course.Letter(id).lower)),
-                        "Новые слова: " + string.Join(", ", lesson.words.Select(w => w.hy)),
-                        "Завтра повторим их, чтобы они запомнились.",
+                        lesson.words.Count > 0 ? "Новые слова: " + string.Join(", ", lesson.words.Select(w => w.hy)) : null,
+                        lesson.words.Count > 0 ? "Завтра повторим их, чтобы они запомнились." : null,
+                        topic ? "Теперь откроется следующая тема." : null,
                     }.Where(line => line != null).ToArray();
                 },
             }));
@@ -247,7 +308,7 @@ namespace Aib.UI
             {
                 Heading = "Повторение",
                 Title = "Вспомним!",
-                Intro = "Буквы и слова, которые пора повторить. Повторение через 1, 3, 7, 14 и 30 дней помогает запомнить их надолго.",
+                Intro = "Буквы и слова, которые пора повторить. Повторение через 1, 2, 4, 7, 14 и 30 дней помогает запомнить их надолго.",
                 Exercises = ExerciseBuilder.BuildReview(Course, keys, Progress.LastCompletedDay, Audio.Has, Environment.TickCount),
                 Finish = session =>
                 {
@@ -302,9 +363,44 @@ namespace Aib.UI
             var now = DateTime.Now;
             return Progress.Due(now).Count == 0 && Course.Lessons.All(l =>
             {
-                var state = DayUnlock.State(l.day, Progress, now);
+                var state = StateOf(l.day, now);
                 return state != DayState.Available && state != DayState.ReviewFirst;
             });
+        }
+
+        /// <summary>State of a letter day or a topic.</summary>
+        public DayState StateOf(int day, DateTime now) => DayUnlock.State(Course, day, Progress, now);
+
+        /// <summary>The learner doesn't want this word: out of lessons and review until restored.</summary>
+        public void RemoveWord(string key)
+        {
+            Progress.RemoveWord(key);
+            SaveProgress();
+        }
+
+        /// <summary>Back to learning a removed word: into review if its day is done (or it came from a text).</summary>
+        public void RestoreWord(string key)
+        {
+            Progress.RestoreWord(key);
+            bool learned = key.StartsWith("d:") || Course.Lessons.Any(l => Progress.Result(l.day) != null &&
+                (l.words.Any(w => w.Key == key) || l.review.Any(id => "w:" + id == key)));
+            if (learned) Progress.Learn(new[] { key }, DateTime.Now);
+            SaveProgress();
+        }
+
+        public void SkipTopic(int day)
+        {
+            if (Course.Lesson(day)?.optional != true) return;
+            Progress.Skip(day);
+            SaveProgress();
+            ShowHome();
+        }
+
+        public void UnskipTopic(int day)
+        {
+            Progress.Unskip(day);
+            SaveProgress();
+            ShowHome();
         }
 
         /// <summary>For testers: every day counts as passed, all letters and words are known.</summary>

@@ -8,8 +8,8 @@ using UnityEngine.UIElements;
 namespace Aib.UI
 {
     /// <summary>
-    /// Armenian texts for those who know the alphabet: Tumanyan's tales (retold simply and in the
-    /// original), poems and songs. Without a text: the list, easiest first — by how many words of
+    /// Armenian texts for those who know the alphabet: tales of Tumanyan close to the original and
+    /// Aghayan's tales shortened, in modern spelling, poems and songs; the best-loved ones are marked with a star. Without a text: the list, easiest first — by how many words of
     /// each text the learner doesn't know yet. With one: the text, where any word can be tapped to
     /// see its meaning and added to training. Words not known yet are red.
     /// </summary>
@@ -53,8 +53,8 @@ namespace Aib.UI
             Add(Ui.TopBar("Армянские тексты", _app.ShowReading));
             var scroll = Ui.Scroll("grow");
             scroll.Add(Ui.Label(
-                "Сказки Туманяна — в простом пересказе и в оригинале, стихи и песни. Нажмите на любое слово, чтобы увидеть перевод. " +
-                "Сначала идут тексты, где меньше всего незнакомых вам слов.", "muted", "center"));
+                "Сказки Туманяна (почти как в оригинале) и повести Агаяна (сокращённые), стихи и песни. Нажмите на любое слово, чтобы увидеть перевод. " +
+                "Сначала идут тексты, где меньше всего незнакомых вам слов. ⭐ — самые известные и любимые в Армении.", "muted", "center"));
 
             var ranked = _app.HyTexts
                 .Select(t => (text: t, unknown: _app.UnknownWords(t, _known)))
@@ -69,7 +69,9 @@ namespace Aib.UI
                     bool read = _app.Progress.IsRead(t.ReadKey);
                     var item = Ui.Button("", () => _app.ShowHyText(t), "reading-item", "hy-item");
                     if (read) item.AddToClassList("read");
+                    if (t.famous) item.AddToClassList("famous");
                     item.Add(Ui.Label($"{t.emoji}  {t.title}" + (read ? "  ✓" : ""), "hy-item-title"));
+                    if (t.famous) item.Add(Ui.Label(FamousNote(t), "hy-famous"));
                     item.Add(Ui.Label($"{t.kind} · {t.author}\n{t.note}\nНезнакомых слов: {unknown}", "muted", "wrap"));
                     content.Add(item);
                 }
@@ -77,6 +79,10 @@ namespace Aib.UI
             scroll.Add(content);
             Add(scroll);
         }
+
+        /// <summary>«⭐ Любимая сказка армян» — or poem, song.</summary>
+        public static string FamousNote(HyText t) =>
+            "⭐ " + (t.kind == "Сказка" ? "Любимая сказка армян" : t.kind == "Песня" ? "Любимая песня армян" : "Любимые стихи армян");
 
         void BuildReader()
         {
@@ -86,6 +92,7 @@ namespace Aib.UI
             page.Add(Ui.Label(_text.emoji, "emoji-big"));
             page.Add(Ui.Label(_text.title, "reading-title"));
             page.Add(Ui.Label(_text.author, "muted", "center"));
+            if (_text.famous) page.Add(Ui.Label(FamousNote(_text), "hy-famous", "center"));
             page.Add(Ui.Label(_text.note, "muted", "center", "wrap"));
             page.Add(Ui.Label("Нажмите на слово — появится перевод. Красные — слова, которых вы ещё не знаете.", "hy-legend", "wrap"));
 
@@ -175,6 +182,7 @@ namespace Aib.UI
                 Button learn = null;
                 learn = Ui.Button($"Учить «{entry.hy}»", () =>
                 {
+                    _app.Progress.RestoreWord(entry.Key);
                     _app.Progress.Learn(new[] { entry.Key }, DateTime.Now);
                     _app.SaveProgress();
                     _known.Add(entry.hy.ToLowerInvariant());

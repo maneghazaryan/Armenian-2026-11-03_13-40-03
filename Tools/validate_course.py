@@ -55,6 +55,7 @@ def main():
     by_id = {l["id"]: l for l in letters}
     errors, warnings = [], []
     known, seen_ids, introduced = set(), set(), set()
+    word_day = {}
 
     for lesson in sorted(lessons, key=lambda l: l["day"]):
         day = lesson["day"]
@@ -94,6 +95,23 @@ def main():
             if not has_audio("w_" + item["id"]):
                 warnings.append(f"day {day}: no audio for w_{item['id']}")
 
+        # Topics after the alphabet: words shown again must come from earlier days; gap sentences
+        # need one [word]; every sentence uses only known letters.
+        for wid in lesson.get("review", []):
+            if wid not in word_day or word_day[wid] >= day:
+                errors.append(f"day {day}: review word '{wid}' is not a word of an earlier day")
+        for item in lesson.get("gaps", []) + lesson.get("order", []):
+            unknown = sorted({t for t in tokenize(item["hy"]) if t not in known})
+            if unknown:
+                errors.append(f"day {day}: '{item['hy']}' uses unlearned letters {unknown}")
+            if not item.get("ru"):
+                errors.append(f"day {day}: '{item['hy']}' has no translation")
+        for item in lesson.get("gaps", []):
+            if not re.fullmatch(r"[^\[\]]*\[[^\[\]]+\][^\[\]]*", item["hy"]):
+                errors.append(f"day {day}: gap sentence '{item['hy']}' needs exactly one [word]")
+        for w in lesson["words"]:
+            word_day[w["id"]] = day
+
     errors += check_dictionary()
 
     for w in warnings:
@@ -109,6 +127,40 @@ def main():
 def normalize(word):
     """Lowercase, letters and inner hyphens only; must match ArmenianDictionary.Normalize."""
     return "".join(c for c in word.lower() if c.isalpha() or c == "-").strip("-")
+
+
+NOUN_ENDINGS = ["ներից", "երից", "ներին", "երին", "ներով", "երով", "ներում", "երում", "ներին", "ները", "երը", "ների", "երի",
+                "ներն", "երն", "ներս", "երս", "ներդ", "երդ", "ներ", "եր", "ումս", "ումդ", "ից", "ով", "ում", "ին", "իս", "իդ",
+                "ն", "ը", "ի", "ս", "դ", "ու"]
+VERB_ENDINGS = [("ացրեցին", ["ացնել"]), ("ացրեց", ["ացնել"]), ("ացրել", ["ացնել"]), ("ացրին", ["ացնել"]),
+                ("եցինք", ["ել", "նել"]), ("եցին", ["ել", "նել"]), ("եցիք", ["ել"]), ("եցեք", ["ել"]),
+                ("եցիր", ["ել"]), ("եցի", ["ել", "նել"]), ("եցավ", ["ենալ", "անալ"]), ("եցան", ["ենալ", "անալ"]),
+                ("եցել", ["ենալ", "անալ"]), ("եցած", ["ենալ", "անալ", "ել"]), ("եց", ["ել", "նել"]),
+                ("ացավ", ["անալ", "ենալ"]), ("ացան", ["անալ", "ենալ"]), ("ացար", ["անալ"]), ("ացա", ["անալ"]),
+                ("ացել", ["անալ", "ալ"]), ("ացած", ["անալ", "ալ"]), ("ացին", ["ալ", "անալ"]), ("ացի", ["ալ"]), ("աց", ["ալ", "անալ"]),
+                ("ելու", ["ել"]), ("ելիս", ["ել"]), ("ելով", ["ել"]), ("ելուց", ["ել"]), ("ելը", ["ել"]),
+                ("ալու", ["ալ"]), ("ալիս", ["ալ"]), ("ալով", ["ալ"]), ("ալուց", ["ալ"]),
+                ("ում", ["ել", "ալ", "նել"]), ("ված", ["վել"]), ("ած", ["ել", "ալ", "նել"]), ("ող", ["ել", "ալ"]),
+                ("ավ", ["նել", "ալ", "ել"]), ("ան", ["նել", "ալ"]), ("ար", ["նել", "ալ"]), ("ա", ["նել", "ալ"]),
+                ("ենք", ["ել", "նել"]), ("եք", ["ել", "նել"]), ("են", ["ել", "նել"]), ("եմ", ["ել", "նել"]), ("ես", ["ել", "նել"]),
+                ("իր", ["ել", "նել"]), ("ի", ["ել", "նել"]), ("ել", ["ել"]), ("ալ", ["ալ"])]
+
+
+def guesses(key):
+    """Possible dictionary words of an unlisted form; must match ArmenianDictionary.Guesses."""
+    for prefix in ("", "կ", "չ"):
+        if not key.startswith(prefix) or len(key) - len(prefix) < 2:
+            continue
+        rest = key[len(prefix):]
+        if prefix:
+            yield rest
+        for end in NOUN_ENDINGS:
+            if len(rest) - len(end) >= 2 and rest.endswith(end):
+                yield rest[:-len(end)]
+        for end, infs in VERB_ENDINGS:
+            if len(rest) - len(end) >= 2 and rest.endswith(end):
+                for inf in infs:
+                    yield rest[:-len(end)] + inf
 
 
 def check_dictionary():
@@ -144,8 +196,11 @@ def check_dictionary():
                 errors.append(f"dictionary line {n}: «{form}» already means «{known[key][0]}»")
             known.setdefault(key, (hy, note))
 
-    def find(word, text_id):
+    def exact(word, text_id):
         return forms.get(text_id, {}).get(word) or forms.get("*", {}).get(word)
+
+    def find(word, text_id):
+        return exact(word, text_id) or next((exact(g, text_id) for g in guesses(word) if exact(g, text_id)), None)
 
     for text in texts:
         missing = []

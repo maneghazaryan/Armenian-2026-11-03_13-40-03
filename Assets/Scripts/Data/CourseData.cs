@@ -21,6 +21,10 @@ namespace Aib.Data
         public string warn;
         /// <summary>Optional deeper explanation (Russian with English comparisons).</summary>
         public string more;
+        /// <summary>Optional Russian keyword starting with the letter's sound; the sound part is in braces: «{а}рка».</summary>
+        public string key;
+        /// <summary>Optional picture (emoji) for the keyword.</summary>
+        public string pic;
 
         public string AudioId => "l_" + id;
         public string Key => "l:" + id;
@@ -58,8 +62,30 @@ namespace Aib.Data
         /// <summary>Russian sentences shown with the known sounds written in Armenian letters.</summary>
         public List<string> texts = new List<string>();
 
+        /// <summary>Ids of words taught on earlier days that a topic shows again («Вы уже знаете»).</summary>
+        public List<string> review = new List<string>();
+        /// <summary>Short explanation cards in Russian with Armenian examples (grammar, polite forms).</summary>
+        public List<string> explain = new List<string>();
+        /// <summary>Sentences with one word in [brackets] to fill in, e.g. «Մենք լավ [ենք]։».</summary>
+        public List<WordData> gaps = new List<WordData>();
+        /// <summary>Extra wrong choices for the gaps (e.g. other endings), besides the other gaps' answers.</summary>
+        public List<string> gapOptions = new List<string>();
+        /// <summary>Sentences to build from their words in the right order.</summary>
+        public List<WordData> order = new List<WordData>();
+        /// <summary>A topic for those who want more (colours, animals…): it can be skipped. Other topics are obligatory.</summary>
+        public bool optional;
+
         /// <summary>A day of new words after the alphabet (Resources/Data/words.json): no new letters.</summary>
         public bool IsWordsDay => newLetters.Count == 0;
+
+        /// <summary>A copy without the words the learner chose not to learn (new and review ones).</summary>
+        public LessonData Keeping(Func<string, bool> keepKey)
+        {
+            var copy = (LessonData)MemberwiseClone();
+            copy.words = words.Where(w => keepKey(w.Key)).ToList();
+            copy.review = review.Where(id => keepKey("w:" + id)).ToList();
+            return copy;
+        }
     }
 
     /// <summary>
@@ -78,6 +104,8 @@ namespace Aib.Data
         /// <summary>Russian title and remark: retold or original, shortened, old spelling modernised.</summary>
         public string note;
         public string emoji;
+        /// <summary>One of the best-known and best-loved Armenian tales and poems: marked in the list.</summary>
+        public bool famous;
         public string text;
 
         public string ReadKey => "hy:" + id;
@@ -147,6 +175,18 @@ namespace Aib.Data
 
         public LessonData Lesson(int day) => Lessons.FirstOrDefault(l => l.day == day);
 
+        /// <summary>Topics of words after the alphabet, in the order they are offered.</summary>
+        public IEnumerable<LessonData> Topics => Lessons.Where(l => l.day > AlphabetDays);
+
+        public bool IsTopic(int day) => day > AlphabetDays;
+
+        /// <summary>A course word by id; null if there is none.</summary>
+        public WordData Word(string id) => Lessons.SelectMany(x => x.words).FirstOrDefault(w => w.id == id);
+
+        /// <summary>Earlier words a topic shows again.</summary>
+        public List<WordData> ReviewWords(LessonData lesson) =>
+            lesson.review.Select(Word).Where(w => w != null).ToList();
+
         /// <summary>Day on which a letter is taught, or 0 if no lesson teaches it yet.</summary>
         public int DayOf(LetterData letter) =>
             Lessons.FirstOrDefault(l => l.newLetters.Contains(letter.id))?.day ?? 0;
@@ -156,8 +196,7 @@ namespace Aib.Data
         {
             if (key.StartsWith("l:")) return _byId.TryGetValue(key.Substring(2), out var l) ? l : null;
             if (key.StartsWith("d:")) return DictWord(key.Substring(2));
-            var id = key.Substring(2);
-            return Lessons.SelectMany(x => x.words).FirstOrDefault(w => w.id == id);
+            return Word(key.Substring(2));
         }
 
         /// <summary>A dictionary word as a word to train (one instance per word); null if unknown.</summary>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Aib.Data;
 using UnityEngine;
 
 namespace Aib.Progress
@@ -50,8 +51,14 @@ namespace Aib.Progress
         public List<MissCount> misses = new List<MissCount>();
         /// <summary>Ids of reading texts read to the end.</summary>
         public List<string> read = new List<string>();
+        /// <summary>Topics (days after the alphabet) the learner chose to skip.</summary>
+        public List<int> skipped = new List<int>();
+        /// <summary>Words the learner doesn't want to learn: not taught, not reviewed.</summary>
+        public List<string> removed = new List<string>();
         /// <summary>When true, the next lesson opens only on the next calendar day; the learner can switch it off.</summary>
         public bool dayLock = true;
+        /// <summary>Day (yyyy-MM-dd) the short recall was last offered at app start, taken or skipped.</summary>
+        public string lastRecall;
         /// <summary>Hour of the daily reminder, or -1 when reminders are off.</summary>
         public int reminderHour = 19;
 
@@ -113,7 +120,33 @@ namespace Aib.Progress
             partial.Clear();
             misses.Clear();
             read.Clear();
+            skipped.Clear();
+            removed.Clear();
         }
+
+        public bool IsSkipped(int day) => skipped.Contains(day);
+
+        /// <summary>Skip a topic: it no longer counts among the open ones; what was done of it is forgotten.</summary>
+        public void Skip(int day)
+        {
+            if (Result(day) != null || skipped.Contains(day)) return;
+            skipped.Add(day);
+            partial.RemoveAll(p => p.day == day);
+        }
+
+        public void Unskip(int day) => skipped.Remove(day);
+
+        public bool IsRemoved(string key) => removed.Contains(key);
+
+        /// <summary>Stop learning a word: it leaves the review and won't be taught in lessons.</summary>
+        public void RemoveWord(string key)
+        {
+            if (!removed.Contains(key)) removed.Add(key);
+            items.RemoveAll(i => i.key == key);
+            misses.RemoveAll(m => m.key == key);
+        }
+
+        public void RestoreWord(string key) => removed.Remove(key);
 
         /// <summary>True when the letter or word is in training (learned on a day or added from a text).</summary>
         public bool IsLearning(string key) => items.Any(i => i.key == key);
@@ -138,6 +171,7 @@ namespace Aib.Progress
         {
             items.RemoveAll(i => !exists(i.key));
             misses.RemoveAll(m => !exists(m.key));
+            removed.RemoveAll(k => !exists(k));
         }
 
         /// <summary>
@@ -152,6 +186,36 @@ namespace Aib.Progress
             .Select(i => i.key)
             .ToList();
 
+        /// <summary>
+        /// A few items for the recall at app start: those due today first, then a random draw where
+        /// hard and little-known items are much likelier than well-known ones.
+        /// </summary>
+        public List<string> RecallKeys(int count, System.Random rng, DateTime today)
+        {
+            var result = Due(today).Take(count).Select(i => i.key).ToList();
+            var pool = items.Where(i => !result.Contains(i.key)).ToList();
+            while (result.Count < count && pool.Count > 0)
+            {
+                double Weight(ItemState i) => IsHard(i.key) ? 2 * (Leitner.MaxBox + 1) : Leitner.MaxBox + 1 - i.box;
+                double roll = rng.NextDouble() * pool.Sum(Weight);
+                var pick = pool[pool.Count - 1];
+                foreach (var i in pool)
+                {
+                    roll -= Weight(i);
+                    if (roll < 0) { pick = i; break; }
+                }
+                result.Add(pick.key);
+                pool.Remove(pick);
+            }
+            return result;
+        }
+
+        /// <summary>The recall is offered once a day, when something is learned already.</summary>
+        public bool ShouldOfferRecall(DateTime today) =>
+            items.Count >= RecallMin && lastRecall != DayUnlock.Format(today);
+
+        public const int RecallMin = 3;
+
         public bool IsRead(string id) => read.Contains(id);
 
         public void MarkRead(string id)
@@ -165,11 +229,11 @@ namespace Aib.Progress
             .OrderBy(i => i.due).ThenBy(i => i.box)
             .ToList();
 
-        /// <summary>Start tracking newly learned items; already known ones are left alone.</summary>
+        /// <summary>Start tracking newly learned items; already known and removed ones are left alone.</summary>
         public void Learn(IEnumerable<string> keys, DateTime today)
         {
             foreach (var key in keys)
-                if (items.All(i => i.key != key))
+                if (!removed.Contains(key) && items.All(i => i.key != key))
                     items.Add(new ItemState { key = key, box = 1, due = DayUnlock.Format(today.AddDays(Leitner.Interval(1))) });
         }
 
@@ -185,15 +249,16 @@ namespace Aib.Progress
 
     public static class Leitner
     {
-        static readonly int[] Days = { 1, 1, 3, 7, 14, 30 };
-        public const int MaxBox = 5;
+        /// <summary>Days until the next review in each box: often at first, since new words are forgotten fast.</summary>
+        static readonly int[] Days = { 1, 1, 2, 4, 7, 14, 30 };
+        public const int MaxBox = 6;
         /// <summary>Most items in one daily review, so it stays short.</summary>
         public const int MaxPerSession = 12;
 
         public static int Interval(int box) => Days[Math.Clamp(box, 1, MaxBox)];
     }
 
-    public enum DayState { Locked, LockedUntilTomorrow, ReviewFirst, Available, Done }
+    public enum DayState { Locked, LockedUntilTomorrow, ReviewFirst, Available, Done, Skipped }
 
     public static class DayUnlock
     {
@@ -214,6 +279,41 @@ namespace Aib.Progress
             if (p.Due(today).Count > 0) return DayState.ReviewFirst;
             return DayState.Available;
         }
+
+        /// <summary>After the alphabet, this many topics are open at once; the learner picks one.</summary>
+        public const int OpenTopics = 2;
+
+        /// <summary>
+        /// Letter days open one after another (see <see cref="State(int, ProgressData, DateTime)"/>).
+        /// Topics after the alphabet open <see cref="OpenTopics"/> at a time: started ones first, then
+        /// the next ones in course order that are neither done nor skipped. With «one lesson a day»,
+        /// none opens on the day the last letter day or topic was finished.
+        /// </summary>
+        public static DayState State(Course course, int day, ProgressData p, DateTime today)
+        {
+            int alphabet = course.AlphabetDays;
+            if (day <= alphabet) return State(day, p, today);
+            if (p.Result(day) != null) return DayState.Done;
+            if (IsSkipped(course, day, p)) return DayState.Skipped;
+            if (p.Result(alphabet) == null || !OpenTopicDays(course, p).Contains(day)) return DayState.Locked;
+            var last = p.results.Where(r => r.day >= alphabet).Select(r => Parse(r.date)).DefaultIfEmpty(DateTime.MinValue).Max();
+            if (p.dayLock && last >= today.Date) return DayState.LockedUntilTomorrow;
+            if (p.Due(today).Count > 0) return DayState.ReviewFirst;
+            return DayState.Available;
+        }
+
+        /// <summary>Only optional topics can be skipped; obligatory ones always stay in the course.</summary>
+        public static bool IsSkipped(Course course, int day, ProgressData p) =>
+            p.IsSkipped(day) && course.Lesson(day)?.optional == true;
+
+        /// <summary>Topics to choose from now: started ones first, then the next in order.</summary>
+        public static List<int> OpenTopicDays(Course course, ProgressData p) => course.Topics
+            .Where(l => p.Result(l.day) == null && !IsSkipped(course, l.day, p))
+            .OrderByDescending(l => p.partial.Any(x => x.day == l.day && x.parts > 0))
+            .ThenBy(l => l.day)
+            .Take(OpenTopics)
+            .Select(l => l.day)
+            .ToList();
 
         public static int Stars(int mistakes) => mistakes == 0 ? 3 : mistakes <= 3 ? 2 : 1;
     }

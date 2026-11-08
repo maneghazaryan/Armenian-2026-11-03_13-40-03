@@ -19,6 +19,9 @@ namespace Aib.Lesson
         BuildWord,           // tap letter tiles in order to spell the word
         MixedText,           // card: Russian text with the known sounds in Armenian letters
         Phrase,              // card: tiny phrase to read, hear and repeat
+        Explain,             // card: how something works (grammar, polite forms), Russian with Armenian examples
+        FillGap,             // sentence with a gap -> choose the missing word
+        BuildSentence,       // tap the words of a sentence in order
     }
 
     public class Exercise
@@ -33,12 +36,14 @@ namespace Aib.Lesson
         /// <summary>Answer choices (PickLetter: lowercase glyphs; others: text) or BuildWord tiles.</summary>
         public List<string> Options = new List<string>();
         public string Answer;
+        /// <summary>WordIntro of a word taught on an earlier day, shown again in a topic.</summary>
+        public bool Review;
 
         public bool IsQuiz => Kind != ExerciseKind.LetterIntro && Kind != ExerciseKind.TraceLetter && Kind != ExerciseKind.WordIntro &&
-                              Kind != ExerciseKind.Phrase && Kind != ExerciseKind.MixedText;
+                              Kind != ExerciseKind.Phrase && Kind != ExerciseKind.MixedText && Kind != ExerciseKind.Explain;
 
-        /// <summary>Progress key of the letter or word this exercise trains (null for texts).</summary>
-        public string ItemKey => Letter != null ? Letter.Key : Word?.Key;
+        /// <summary>Progress key of the letter or word this exercise trains (null for texts and sentences).</summary>
+        public string ItemKey => Kind == ExerciseKind.BuildSentence || Kind == ExerciseKind.FillGap ? null : Letter != null ? Letter.Key : Word?.Key;
 
         /// <summary>The letter or word it is about, to keep the same one from coming twice in a row.</summary>
         internal object Item => (object)Letter ?? (object)Word ?? Shown;
@@ -66,10 +71,15 @@ namespace Aib.Lesson
             var known = course.LettersUpTo(lesson.day);
             var knownWords = course.WordsUpTo(lesson.day);
             var result = new List<Exercise>();
+            // A topic shows some words of earlier days again; they are practised with the new ones.
+            var review = course.ReviewWords(lesson);
+            var words = lesson.words.Concat(review).ToList();
 
             switch (part)
             {
                 case 1:
+                    foreach (var text in lesson.explain)
+                        result.Add(new Exercise { Kind = ExerciseKind.Explain, Shown = text });
                     // Meet each new letter and trace it, small then capital; then recognise it by sound
                     // and as capital/small. Two older letters get their capitals refreshed too.
                     foreach (var id in lesson.newLetters)
@@ -93,21 +103,24 @@ namespace Aib.Lesson
                     result.AddRange(Spread(letterQuizzes, rng));
 
                     // Meet each new word with its meaning before being asked about it, then practise.
-                    foreach (var word in lesson.words)
-                        result.Add(new Exercise { Kind = ExerciseKind.WordIntro, Word = word, UseAudio = hasAudio(word.AudioId) });
+                    foreach (var word in words)
+                        result.Add(new Exercise { Kind = ExerciseKind.WordIntro, Word = word, UseAudio = hasAudio(word.AudioId), Review = review.Contains(word) });
                     var first = new List<Exercise>();
+                    // New words are read and spelled; words already known are recalled from their meaning.
                     foreach (var word in lesson.words)
                     {
                         first.Add(ReadPick(word, knownWords, hasAudio, rng));
                         first.Add(BuildWord(word, known, hasAudio, rng));
                     }
-                    result.AddRange(Spread(first, rng, after: result.LastOrDefault()));
+                    foreach (var word in review)
+                        first.Add(MeaningPick(word, knownWords, hasAudio, rng));
+                    result.AddRange(Spread(first.Concat(Gaps(lesson, rng)), rng, after: result.LastOrDefault()));
                     break;
 
                 case 2:
                     // Same words, other angles: meaning -> word, listening, spelling, reading.
                     var more = new List<Exercise>();
-                    foreach (var word in lesson.words)
+                    foreach (var word in words)
                     {
                         more.Add(MeaningPick(word, knownWords, hasAudio, rng));
                         more.Add(ReadPick(word, knownWords, hasAudio, rng));
@@ -120,6 +133,7 @@ namespace Aib.Lesson
                         more.Add(MatchCase(course.Letter(id), known, rng));
                         more.Add(Draw(ExerciseKind.DrawLetter, course.Letter(id), course.Letter(id).lower));
                     }
+                    more.AddRange(lesson.order.Select(o => BuildSentence(o, rng)));
                     result.AddRange(Spread(more, rng));
                     break;
 
@@ -130,9 +144,14 @@ namespace Aib.Lesson
                         result.Add(new Exercise { Kind = ExerciseKind.MixedText, Shown = ArmenianText.MixRussian(text, glyphs), Answer = text });
                     foreach (var phrase in lesson.phrases.Concat(lesson.verses))
                         result.Add(new Exercise { Kind = ExerciseKind.Phrase, Word = phrase, UseAudio = hasAudio(phrase.AudioId) });
-                    // A day of new words ends with a check: every word of the day from its meaning.
+                    // A day of new words ends with a check: its phrases built from their words (the words
+                    // learned so far put together), the gap sentences, every word of the day from its meaning.
                     if (lesson.IsWordsDay)
-                        result.AddRange(Spread(lesson.words.Select(w => MeaningPick(w, knownWords, hasAudio, rng)), rng, after: result.LastOrDefault()));
+                        result.AddRange(Spread(Gaps(lesson, rng)
+                            .Concat(lesson.phrases.Where(CanBuild).Select(p => BuildSentence(p, rng)))
+                            .Concat(words.Select(w => MeaningPick(w, knownWords, hasAudio, rng)))
+                            .Concat(lesson.words.Select(w => ReadPick(w, knownWords, hasAudio, rng))),
+                            rng, after: result.LastOrDefault()));
                     break;
             }
             return result;
@@ -209,6 +228,57 @@ namespace Aib.Lesson
                 if (sc > bestScore) (best, bestScore) = (e, sc);
             }
             return best;
+        }
+
+        /// <summary>«Մենք լավ [ենք]։» -> «Մենք լավ …։», choose among the lesson's bracketed words.</summary>
+        public static List<Exercise> Gaps(LessonData lesson, Random rng)
+        {
+            var pool = lesson.gaps.Select(g => GapAnswer(g.hy)).Where(a => a != null).Concat(lesson.gapOptions).Distinct().ToList();
+            return lesson.gaps.Where(g => GapAnswer(g.hy) != null).Select(g =>
+            {
+                var answer = GapAnswer(g.hy);
+                return new Exercise
+                {
+                    Kind = ExerciseKind.FillGap,
+                    Word = g,
+                    Shown = System.Text.RegularExpressions.Regex.Replace(g.hy, @"\[[^\]]*\]", "…"),
+                    Answer = answer,
+                    Options = WithDistractors(answer, pool, rng),
+                };
+            }).ToList();
+        }
+
+        /// <summary>The bracketed word of a gap sentence, or null.</summary>
+        public static string GapAnswer(string hy)
+        {
+            int a = hy.IndexOf('['), b = hy.IndexOf(']');
+            return a >= 0 && b > a + 1 ? hy.Substring(a + 1, b - a - 1) : null;
+        }
+
+        /// <summary>A gap sentence written out in full.</summary>
+        public static string GapFull(string hy) => hy.Replace("[", "").Replace("]", "");
+
+        /// <summary>The words of a sentence, end punctuation dropped; «՞» stays inside its word.</summary>
+        public static List<string> SentenceWords(string hy) =>
+            hy.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+              .Select(w => w.TrimEnd('։', '.', ',', '!', '՝'))
+              .Where(w => w.Length > 0)
+              .ToList();
+
+        /// <summary>A short phrase without a dialogue dash can be built from its words.</summary>
+        public static bool CanBuild(WordData phrase)
+        {
+            int n = SentenceWords(phrase.hy).Count;
+            return n >= 2 && n <= 6 && !phrase.hy.Contains("—");
+        }
+
+        public static Exercise BuildSentence(WordData sentence, Random rng)
+        {
+            var parts = SentenceWords(sentence.hy);
+            var options = Shuffled(parts, rng);
+            // Never offer the words already in order.
+            if (parts.Count > 1 && options.SequenceEqual(parts)) options.Reverse();
+            return new Exercise { Kind = ExerciseKind.BuildSentence, Word = sentence, Answer = string.Join(" ", parts), Options = options };
         }
 
         /// <summary>Trace or write one form of a letter.</summary>
@@ -340,6 +410,14 @@ namespace Aib.Lesson
             }
             _history.Push((requeued, newlyMissed));
             _index++;
+        }
+
+        /// <summary>The learner doesn't want this word: its exercises from here on are dropped. Earlier steps can't be undone after it.</summary>
+        public void Drop(WordData word)
+        {
+            for (int i = _queue.Count - 1; i >= _index; i--)
+                if (_queue[i].Word == word) _queue.RemoveAt(i);
+            _history.Clear();
         }
 
         /// <summary>Returns to the previous step and undoes what completing it did.</summary>

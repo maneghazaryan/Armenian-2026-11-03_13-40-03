@@ -11,12 +11,34 @@ letters a day, and from day 1 you read real words made only of the letters you k
   home screen, the next lesson opens right away. Either way today's review comes first.
 - **The whole alphabet in 17 days:** ս ա ր · մ ի · ն ե · ո տ · ու լ · կ վ է · բ և · պ դ ·
   գ զ · շ ժ · հ յ · խ ղ · թ ք փ · ծ ց · ճ չ ջ · ռ ձ ը · օ ֆ.
-- **After the alphabet: new words every day.** Days 18–32 (`words.json`) each bring 7–9
-  everyday words on one theme (family, numbers, colours, food, home, body, time, weather,
-  animals, town, verbs, adjectives, questions, clothes, school and work) with two phrases.
-  They open one a day like the letter days; part 3 reads the phrases and checks every word.
-- **Spaced review (Leitner boxes).** Every learned letter and word comes back after 1, 3, 7,
-  14 and 30 days; a mistake sends it back to "tomorrow". At most 12 items per day.
+- **After the alphabet: very small topics** (`words.json`, 83 topics of 1–3 new words, a few grammar
+  topics with none). Learners forget fast, so information comes in tiny portions and comes back a lot.
+  The words people use most come first: հա/չէ, then the polite այո/ոչ; Բարև ձեզ; Ո՞նց ես — Լավ եմ;
+  Հաջողություն; մենք/դուք; քո; «есть» (եմ, ես, է, then ենք, եք, են — the auxiliary verb); word
+  order; questions and «не»; կներեք/ներողություն; մերսի/խնդրեմ; где/куда; health; family; people;
+  ջան; the shop (տոպրակ, քարտով); numbers… The colloquial word is taught first and its polite or book
+  form beside it, with a note why.
+  **Obligatory and optional.** 57 topics are obligatory; 26 (`"optional": true`: colours, weather,
+  clothes, school, animals…) say «по желанию» and can be skipped («Пропустить тему») and brought back
+  («Вернуть»). Two topics are open at a time and the learner picks one (a started topic stays open).
+  With «Один урок в день» no topic opens on the day one was finished.
+  **Endings** have their own tiny topics, each right after the words it uses: -ություն
+  (հաջողություն, առողջություն…), plural -եր/-ներ, -ը/-ն («этот»), -ս/-դ («мой/твой»), -ում («в»)
+  and -ից («из»: Ես Ռուսաստանից եմ). The learner fills in the missing ending (`gapOptions` adds wrong
+  choices).
+  **Phrases from learned words.** Part 3 of a topic builds each of its short phrases from shuffled words.
+  **Repetition.** Lessons only teach; reminding happens when the app opens: once a day «С возвращением!»
+  offers a short recall (6 words and one phrase to build), which can be skipped. It takes today's due
+  items first, then picks at random, with hard and weakly known words much likelier than well-known ones.
+  A mistake brings the word back tomorrow. New words are read, spelled, recalled from their meaning and
+  listened to in all three parts of a topic.
+  A topic can show words of earlier days again (`review`: «Вы уже знаете это слово»), explain
+  something (`explain`: cards in Russian with Armenian examples), drill sentences with a missing word
+  (`gaps`: «Մենք լավ [ենք]։») and have sentences built from shuffled words (`order`).
+- **Words you don't want.** «Не учить это слово» on a new word's card, or «Убрать» in the dictionary,
+  takes a word out of lessons and review; «Убранные слова» in the dictionary bring it back.
+- **Spaced review (Leitner boxes).** Every learned letter and word comes back after 1, 2, 4,
+  7, 14 and 30 days; a mistake sends it back to "tomorrow". At most 12 items per day.
   «Повторение» is always on the home screen once something is learned: today's due items, or,
   when nothing is due, a free practice of hard and least remembered items (correct answers
   don't move review dates; a mistake marks the item hard and brings it back tomorrow).
@@ -24,15 +46,19 @@ letters a day, and from day 1 you read real words made only of the letters you k
   checked against sources, in Russian with every sound the learner already knows written in
   Armenian letters. The more letters learned, the more Armenian the text shows; «Показать
   по-русски» switches to plain Russian. Texts live in `Assets/Resources/Data/reading.json`.
-- **Armenian texts (after the alphabet).** «Чтение» → «Армянские тексты»: Tumanyan's tales
-  retold simply (Ծիտը, Անխելք մարդը, Կիկոսի մահը, Անբան Հուռին) and in the original, three short
-  stories written for the app, Tumanyan's quatrains, Charents's «Ես իմ անուշ Հայաստանի», the
-  anthem «Մեր Հայրենիք» and the songs «Կիլիկիա» and «Կռունկ» (first stanzas, modern spelling).
-  All are in the public domain; originals come from Armenian Wikisource. Any word can be tapped:
-  how it reads, what this form means, its dictionary form, and «Учить» adds it to the daily
-  review. Words the learner doesn't know yet are red. The list is sorted by the number of
-  unknown words (words of passed days and words added from texts count as known) and grouped
-  by that number: up to 25, up to 60, more.
+- **Armenian texts (after the alphabet).** «Чтение» → «Армянские тексты»: 22 texts. Three short
+  stories written for the app; Tumanyan's tales almost as he wrote them (Ծիտը, Պոչատ աղվեսը, Անխելք
+  մարդը, Կիկոսի մահը, Անբան Հուռին, Սուտասանը, Կացին ախպեր, Քաջ Նազարը, Ձախորդ Փանոսը and the tale in verse Շունն ու
+  կատուն): the same sentences, songs and rhymes, only dialect words replaced by standard ones (էս →
+  այս, ձեն → ձայն, հեր → հայր…) where the rhythm allows; Aghayan's Անահիտ and Արեգնազան shortened to
+  about 3,600 words from his own sentences, dialogues and verses. Poems: Tumanyan's quatrains and
+  «Ա՜խ, ես երանի…», the anthem, Charents's «Ես իմ անուշ Հայաստանի», Nalbandyan's «Ազատություն» and
+  Teryan's «Էստոնական երգ», and Khnko Aper's fable in verse «Մկների ժողովը» as he wrote it. The best-known and best-loved ones (`"famous": true`) have a gold frame
+  and «⭐ Любимая сказка армян». All are in the public domain; sources are on Armenian Wikisource.
+  Any word can be tapped: how it reads, what it means, its dictionary form, and «Учить» adds it to
+  the daily review. Words the learner doesn't know yet are red. The list is sorted by the number of
+  unknown words (words of passed days and words added from texts count as known) and grouped by
+  that number: up to 25, up to 60, more.
 - **Russian «р».** In mixed texts ր is used only for the soft «р» before и е ё ю я ь («сирена»,
   «пример»). Every hard «р» («рама», «красиво», «размер», «терраса») is ռ and stays Russian until
   ռ is learned. Names written with ր in Armenian («Сахара», unlike «сахар») are listed as exceptions.
@@ -72,8 +98,8 @@ letters a day, and from day 1 you read real words made only of the letters you k
 - **Dictionary (Словарь):** all words, phrases and verses from completed days; read first, tap
   to see the meaning. Words with mistakes are highlighted until two reviews in a row go well
   (the alphabet marks such letters too).
-- **Start over:** «Сбросить прогресс» on the home screen (tap twice) forgets all days, reviews
-  and read texts; the settings stay. «Открыть все уроки» (tap twice) is for testers: it marks
+- **Start over:** «Сбросить прогресс» on the home screen (tap twice) forgets all days, reviews,
+  read texts, skipped topics and removed words; the settings stay. «Открыть все уроки» (tap twice) is for testers: it marks
   every day as passed.
 - **Daily reminders:** local notifications (no server) at 9, 13, 19 or 21 h, or off.
 - Progress is saved on the device (`progress.json` in `Application.persistentDataPath`).
@@ -81,11 +107,11 @@ letters a day, and from day 1 you read real words made only of the letters you k
 ## Project layout
 | Path | What |
 |---|---|
-| `Assets/Resources/Data/letters.json` | alphabet: glyphs, name, Russian sound, `look` (shape association), tip, warning, `more` (deep explanation) |
+| `Assets/Resources/Data/letters.json` | alphabet: glyphs, name, Russian sound, `look` (shape association), `key` (Russian keyword, sound part in braces: `{а}рка`) and `pic` (its emoji) for the primer-style letter card, tip, warning, `more` (deep explanation) |
 | `Assets/Resources/Data/lessons.json` | day-by-day lessons: new letters, words, phrases, verses |
-| `Assets/Resources/Data/words.json` | word days after the alphabet (same format, no `newLetters`) |
-| `Assets/Resources/Data/texts_hy.json` | Armenian stories, poems and songs (`id`, `kind`, `title`, `author`, `note`, `emoji`, `text`; empty line = new paragraph or stanza) |
-| `Assets/Resources/Data/dictionary.txt` | every word of the Armenian texts: `слово = значение \| форма = значение формы; форма`; lines under `[text-id]` apply only to that text (dialect) |
+| `Assets/Resources/Data/words.json` | topics after the alphabet (same format, no `newLetters`; optional `review`, `explain`, `gaps`, `order`, `optional`) |
+| `Assets/Resources/Data/texts_hy.json` | Armenian stories, poems and songs (`id`, `kind`, `title`, `author`, `note`, `emoji`, `famous`, `text`; empty line = new paragraph or stanza) |
+| `Assets/Resources/Data/dictionary.txt` | every word of the Armenian texts: `слово = значение \| форма = значение формы; форма`; lines under `[text-id]` apply only to that text (dialect). Forms that aren't listed are found through common endings (‑ը, ‑ին, ‑ից, ‑ներ, ‑եց, ‑ում, կ‑/չ‑…): «կսպանի» → «սպանել» |
 | `Assets/Resources/Audio/` | `l_<letterId>.mp3` and `w_<wordId>.mp3` clips (optional) |
 | `Assets/Resources/Fonts/` | Noto Sans, Noto Sans Armenian, Symbols 2, Noto Emoji (SIL OFL) |
 | `Assets/Resources/UI/App.uss` | all styles |
@@ -126,7 +152,9 @@ Update the site: copy `Build/Web` into a clone of `maneghazaryan/ayb` (keep `.no
 2. Run `python3 Tools/validate_course.py`. It must report 0 errors.
 
 ## Adding an Armenian text
-1. Add it to `texts_hy.json`.
+1. Add it to `texts_hy.json` (`"famous": true` marks a best-loved one). Poems by authors who died
+   less than 70 years ago (Sevak, Kaputikyan, Shiraz, Sahyan…) are still under copyright: add
+   them only with permission from the rights holders.
 2. Run `python3 Tools/validate_course.py`: it lists the words missing from `dictionary.txt`.
    Add them (a new form goes after «|» of its dictionary word), until there are 0 errors.
 
@@ -149,7 +177,7 @@ Unity -batchmode -projectPath . -runTests -testPlatform EditMode -testResults re
 ## Roadmap
 1. ✅ Reading MVP: days 1–7 (16 letters), spaced review, dictionary, reminders.
 2. ✅ Full alphabet: days 8–17 (39 letters).
-3. ✅ Words every day after the alphabet (days 18–32), Armenian texts with a tap-to-translate dictionary.
+3. ✅ Small word topics after the alphabet (choose, skip, remove words), Armenian texts with a tap-to-translate dictionary.
 4. Audio, record-and-compare speaking practice; a native speaker's check of the texts' glosses.
 5. Optional AI tutor (Google Gemini free tier behind a free Cloudflare Worker) that explains
    grammar in Russian using only the letters you have learned.
