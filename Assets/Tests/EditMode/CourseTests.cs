@@ -561,6 +561,30 @@ namespace Aib.Tests
         }
 
         [Test]
+        public void ManyDueItems_OneReviewOpensTheNextLesson()
+        {
+            var course = LoadCourse();
+            var today = new DateTime(2026, 11, 10);
+            var p = new ProgressData { dayLock = false };
+            for (int d = 1; d <= course.AlphabetDays; d++) p.Complete(d, 3, today.AddDays(-2));
+            // More items due than one session holds (e.g. after «open all lessons»).
+            var keys = course.Lessons.SelectMany(l => l.words).Select(w => w.Key).Take(30).ToList();
+            p.Learn(keys, today.AddDays(-2));
+            int topic = DayUnlock.OpenTopicDays(course, p)[0];
+            Assert.AreEqual(30, p.Due(today).Count);
+            Assert.AreEqual(DayState.ReviewFirst, DayUnlock.State(course, topic, p, today));
+
+            // One session of Leitner.MaxPerSession items: the count goes down and lessons open.
+            foreach (var item in p.Due(today).Take(Leitner.MaxPerSession).ToList()) p.Reviewed(item.key, true, today);
+            p.MarkReviewed(today);
+            Assert.AreEqual(30 - Leitner.MaxPerSession, p.Due(today).Count);
+            Assert.AreEqual(DayState.Available, DayUnlock.State(course, topic, p, today));
+
+            // Next day, items still due ask for one review again.
+            Assert.AreEqual(DayState.ReviewFirst, DayUnlock.State(course, topic, p, today.AddDays(1)));
+        }
+
+        [Test]
         public void Topics_TwoOpenAtOnce_OnlyOptionalOnesCanBeSkipped()
         {
             var course = LoadCourse();

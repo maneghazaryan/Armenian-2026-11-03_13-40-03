@@ -124,6 +124,7 @@ namespace Aib.UI
                         if (due.Contains(key) || session.Missed.Contains(key))
                             Progress.Reviewed(key, !session.Missed.Contains(key), now);
                     Progress.Missed(session.Missed);
+                    if (keys.Any(due.Contains)) Progress.MarkReviewed(now);
                     SaveProgress();
                     int remembered = keys.Count(k => !session.Missed.Contains(k));
                     return new[]
@@ -316,13 +317,16 @@ namespace Aib.UI
                     foreach (var key in keys)
                         Progress.Reviewed(key, !session.Missed.Contains(key), now);
                     Progress.Missed(session.Missed);
+                    Progress.MarkReviewed(now);
                     SaveProgress();
                     int remembered = keys.Count(k => !session.Missed.Contains(k));
+                    int left = Progress.Due(now).Count;
                     return new[]
                     {
                         $"Вспомнили сразу: {remembered} из {keys.Count}.",
                         session.Missed.Count > 0 ? "Ошибки повторим снова завтра." : "Отлично! Следующее повторение — через несколько дней.",
-                    };
+                        left > 0 ? $"Ещё можно повторить: {left}. Это можно сделать позже — уроки уже открыты." : null,
+                    }.Where(line => line != null).ToArray();
                 },
             }));
         }

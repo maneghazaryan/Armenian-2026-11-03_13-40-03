@@ -59,6 +59,8 @@ namespace Aib.Progress
         public bool dayLock = true;
         /// <summary>Day (yyyy-MM-dd) the short recall was last offered at app start, taken or skipped.</summary>
         public string lastRecall;
+        /// <summary>Day (yyyy-MM-dd) of the last finished review of due items (review or recall).</summary>
+        public string lastReview;
         /// <summary>Hour of the daily reminder, or -1 when reminders are off.</summary>
         public int reminderHour = 19;
 
@@ -122,6 +124,7 @@ namespace Aib.Progress
             read.Clear();
             skipped.Clear();
             removed.Clear();
+            lastReview = null;
         }
 
         public bool IsSkipped(int day) => skipped.Contains(day);
@@ -223,6 +226,16 @@ namespace Aib.Progress
             if (!read.Contains(id)) read.Add(id);
         }
 
+        /// <summary>
+        /// Lessons wait for a review only until one review is done today; the rest of the due items
+        /// can be repeated later, a session at a time.
+        /// </summary>
+        public bool ReviewPending(DateTime today) =>
+            lastReview != DayUnlock.Format(today) && Due(today).Count > 0;
+
+        /// <summary>A review of due items was finished today.</summary>
+        public void MarkReviewed(DateTime today) => lastReview = DayUnlock.Format(today);
+
         /// <summary>Items whose review date has come, most overdue first.</summary>
         public List<ItemState> Due(DateTime today) => items
             .Where(i => DayUnlock.Parse(i.due) <= today.Date)
@@ -276,7 +289,7 @@ namespace Aib.Progress
                 if (prev == null) return DayState.Locked;
                 if (p.dayLock && Parse(prev.date) >= today.Date) return DayState.LockedUntilTomorrow;
             }
-            if (p.Due(today).Count > 0) return DayState.ReviewFirst;
+            if (p.ReviewPending(today)) return DayState.ReviewFirst;
             return DayState.Available;
         }
 
@@ -298,7 +311,7 @@ namespace Aib.Progress
             if (p.Result(alphabet) == null || !OpenTopicDays(course, p).Contains(day)) return DayState.Locked;
             var last = p.results.Where(r => r.day >= alphabet).Select(r => Parse(r.date)).DefaultIfEmpty(DateTime.MinValue).Max();
             if (p.dayLock && last >= today.Date) return DayState.LockedUntilTomorrow;
-            if (p.Due(today).Count > 0) return DayState.ReviewFirst;
+            if (p.ReviewPending(today)) return DayState.ReviewFirst;
             return DayState.Available;
         }
 

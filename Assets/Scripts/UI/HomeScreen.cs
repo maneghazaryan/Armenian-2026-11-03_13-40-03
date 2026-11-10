@@ -36,9 +36,11 @@ namespace Aib.UI
                 var review = Ui.Box("day-card", "review-card");
                 var text = Ui.Box("grow");
                 text.Add(Ui.Label(due > 0 ? "Повторение на сегодня" : "Повторение", "day-title"));
-                text.Add(Ui.Label(due > 0
-                    ? $"Букв и слов: {Math.Min(due, Leitner.MaxPerSession)}"
-                    : "На сегодня всё повторено — можно потренироваться ещё.", "muted", "wrap"));
+                // The real number left; one session takes at most Leitner.MaxPerSession of them.
+                text.Add(Ui.Label(due == 0
+                    ? "На сегодня всё повторено — можно потренироваться ещё."
+                    : $"Осталось: {due}" + (due > Leitner.MaxPerSession ? $" (по {Leitner.MaxPerSession} за раз)" : ""),
+                    "muted", "wrap"));
                 review.Add(text);
                 review.Add(Ui.Button(due > 0 ? "Повторить" : "Тренировка", app.ShowReview, due > 0 ? "btn-primary" : "btn-secondary"));
                 list.Add(review);
